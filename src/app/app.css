@@ -1,7 +1,12 @@
 :host {
   --tinta: #2e2e38;
   --tinta-suave: #646470;
-  --amarillo: #ffe600;
+  /* Naranja de marca La Comer, tomado del favicon oficial de lacomer.com.mx.
+     --acento-oscuro es la misma familia de color, bajada de luminosidad para
+     que el texto blanco encima cumpla contraste AA (5.25:1). */
+  --acento: #f0501e;
+  --acento-oscuro: #c43c10;
+  --acento-suave: #fff1ec;
   --linea: #e3e3ea;
   --fondo: #f6f6f8;
   --mal: #b3261e;
@@ -39,7 +44,7 @@
 .acento {
   width: 6px;
   height: 40px;
-  background: var(--amarillo);
+  background: var(--acento);
   border-radius: 3px;
 }
 
@@ -127,8 +132,8 @@ code {
 
 .zona:hover,
 .zona.activa {
-  border-color: var(--amarillo);
-  background: #fffdf0;
+  border-color: var(--acento);
+  background: var(--acento-suave);
 }
 
 .zona strong {
@@ -144,7 +149,7 @@ code {
   width: 34px;
   height: 34px;
   border: 3px solid var(--linea);
-  border-top-color: var(--amarillo);
+  border-top-color: var(--acento);
   border-radius: 50%;
   animation: gira 0.8s linear infinite;
 }
@@ -167,8 +172,8 @@ code {
   padding: 11px 20px;
   border: 0;
   border-radius: 6px;
-  background: var(--amarillo);
-  color: var(--tinta);
+  background: var(--acento-oscuro);
+  color: #fff;
   font: 600 13.5px/1 inherit;
   cursor: pointer;
   white-space: nowrap;
@@ -296,7 +301,7 @@ a.descarga .pie {
 }
 
 a.descarga strong {
-  color: var(--amarillo);
+  color: var(--acento);
 }
 
 a.descarga:hover {
