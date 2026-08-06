@@ -130,6 +130,10 @@ export interface Analisis {
 
   validacion: Validacion;
   correccion?: Correccion | null;
+  /** % de OSA real del periodo: sobre TODAS las filas de BOPS_OSA, no sólo
+   *  los días con faltante. Es la foto general antes de entrar a la causa
+   *  raíz de cada día. Viene en estado 'ok' y 'sin_datos'. */
+  osa_general?: number | null;
   aviso_parcial?: string | null;
   advertencias?: string[];
   fuentes?: Fuente[];

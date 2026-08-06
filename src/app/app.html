@@ -128,23 +128,13 @@
         </p>
       }
 
-      @if (faltanDatos().length) {
-        <section class="tarjeta">
-          <h2>Fuentes que no llegaron completas</h2>
-          <p class="nota">
-            El layout está bien; lo que falta son renglones. El modelo corrió de todos modos y
-            reporta abajo qué días se quedaron sin explicar por esto.
-          </p>
-          <ul class="lista medio">
-            @for (d of faltanDatos(); track d) {
-              <li>{{ d }}</li>
-            }
-          </ul>
-        </section>
-      }
-
-      <!-- indicadores -->
+      <!-- vista general: la foto completa antes de entrar al detalle -->
       <section class="cifras">
+        <div class="cifra">
+          <span class="etiqueta">OSA general del periodo</span>
+          <strong>{{ r.osa_general }}%</strong>
+          <span class="pie">Todas las tiendas y SKU, no sólo los días con faltante</span>
+        </div>
         <div class="cifra">
           <span class="etiqueta">Días con faltante</span>
           <strong>{{ r.cobertura!.casos_totales }}</strong>
@@ -169,6 +159,22 @@
           <span class="pie">5 hojas · {{ r.nombre_salida }}</span>
         </a>
       </section>
+
+      <!-- de lo general a lo particular: aquí empieza el detalle -->
+      @if (faltanDatos().length) {
+        <section class="tarjeta">
+          <h2>Fuentes que no llegaron completas</h2>
+          <p class="nota">
+            El layout está bien; lo que falta son renglones. El modelo corrió de todos modos y
+            reporta abajo qué días se quedaron sin explicar por esto.
+          </p>
+          <ul class="lista medio">
+            @for (d of faltanDatos(); track d) {
+              <li>{{ d }}</li>
+            }
+          </ul>
+        </section>
+      }
 
       <!-- pareto -->
       <div class="dos">
@@ -283,11 +289,11 @@
           </table>
 
           @if (r.por_subcausa?.length) {
-            <h3>Qué falla del proveedor costó más</h3>
+            <h3>Qué detalle de la causa costó más</h3>
             <table>
               <thead>
                 <tr>
-                  <th>Falla</th>
+                  <th>Detalle / subcausa</th>
                   <th class="num">Días</th>
                   <th class="num">Venta perdida</th>
                 </tr>
