@@ -1,0 +1,450 @@
+<header class="barra">
+  <div class="marca">
+    <span class="acento"></span>
+    <div>
+      <h1>Clasificación de desabasto por causa raíz</h1>
+      <p>La Comer · Reingeniería de la Cadena de Suministro</p>
+    </div>
+  </div>
+  @if (paso() !== 'inicio') {
+    <button class="btn-plano" (click)="reiniciar()">Analizar otro archivo</button>
+  }
+</header>
+
+<main>
+  <!-- ============================ CARGA ============================ -->
+  @if (paso() === 'inicio' || paso() === 'error') {
+    <section class="tarjeta">
+      <label
+        class="zona"
+        [class.activa]="arrastrando()"
+        (dragover)="sobrevolar($event, true)"
+        (dragleave)="sobrevolar($event, false)"
+        (drop)="soltar($event)"
+      >
+        <input type="file" accept=".xlsx" (change)="elegir($event)" hidden />
+        <strong>Arrastra aquí el Excel de captura</strong>
+        <span>o haz clic para buscarlo · sólo .xlsx</span>
+      </label>
+
+      @if (error(); as e) {
+        <p class="aviso mal">{{ e }}</p>
+      }
+    </section>
+  }
+
+  <!-- ========================== TRABAJANDO ========================== -->
+  @if (paso() === 'trabajando') {
+    <section class="tarjeta centro">
+      <div class="girando"></div>
+      <p>Validando el layout y clasificando los días con faltante…</p>
+    </section>
+  }
+
+  @if (resultado(); as r) {
+    <!-- ======================= LAYOUT BLOQUEADO ======================= -->
+    @if (paso() === 'bloqueado') {
+      <section class="tarjeta">
+        <h2>El layout no pasó la validación</h2>
+        <p class="nota">
+          Archivo: <strong>{{ r.archivo }}</strong> · {{ r.validacion.errores.length }} errores ·
+          {{ r.validacion.advertencias.length }} advertencias
+        </p>
+
+        <h3>Errores de layout · el modelo leería mal</h3>
+        <ul class="lista mal">
+          @for (e of r.validacion.errores; track e) {
+            <li>{{ e }}</li>
+          }
+        </ul>
+
+        @if (r.validacion.faltan_datos.length) {
+          <h3>Datos incompletos · no bloquean</h3>
+          <ul class="lista medio">
+            @for (d of r.validacion.faltan_datos; track d) {
+              <li>{{ d }}</li>
+            }
+          </ul>
+        }
+
+        @if (r.validacion.advertencias.length) {
+          <h3>Advertencias</h3>
+          <ul class="lista medio">
+            @for (a of r.validacion.advertencias; track a) {
+              <li>{{ a }}</li>
+            }
+          </ul>
+        }
+
+        @if (ofreceCorreccion()) {
+          <div class="caja-accion">
+            <div>
+              <strong>{{ r.cambios_propuestos?.length }} de estos se pueden corregir solos.</strong>
+              <p class="nota">
+                Encabezados con nombre de negocio, claves capturadas como número, fórmulas sin
+                valor y filas guía. Quedarían
+                {{ r.errores_tras_correccion?.length }} errores que no dependen del layout, sino de
+                datos que faltan: esos no bloquean, salen como cobertura perdida. El archivo
+                original no se modifica.
+              </p>
+              <details>
+                <summary>Ver los {{ r.cambios_propuestos?.length }} cambios</summary>
+                <ul class="lista">
+                  @for (c of r.cambios_propuestos; track c) {
+                    <li>{{ c }}</li>
+                  }
+                </ul>
+              </details>
+            </div>
+            <button class="btn" (click)="analizar(true)">Corregir y analizar</button>
+          </div>
+        } @else {
+          <p class="aviso mal">
+            Estos errores no se pueden corregir automáticamente. Hay que pedirle la corrección al
+            equipo dueño de la hoja.
+          </p>
+        }
+      </section>
+    }
+
+    <!-- ========================== SIN DATOS ========================== -->
+    @if (paso() === 'sin-datos') {
+      <section class="tarjeta">
+        <h2>No hay nada que clasificar</h2>
+        <p class="aviso medio">{{ r.motivo }}</p>
+      </section>
+    }
+
+    <!-- =========================== RESULTADO =========================== -->
+    @if (paso() === 'listo' && r.cobertura; as _) {
+      @if (r.aviso_parcial; as aviso) {
+        <p class="aviso mal grande">{{ aviso }}</p>
+      }
+
+      @if (r.correccion; as c) {
+        <p class="aviso medio">
+          Se aplicaron {{ c.cambios.length }} correcciones de layout antes de analizar. El archivo
+          original que subiste no se modificó.
+        </p>
+      }
+
+      @if (r.validacion.faltan_datos.length) {
+        <section class="tarjeta">
+          <h2>Fuentes que no llegaron completas</h2>
+          <p class="nota">
+            El layout está bien; lo que falta son renglones. El modelo corrió de todos modos y
+            reporta abajo qué días se quedaron sin explicar por esto.
+          </p>
+          <ul class="lista medio">
+            @for (d of r.validacion.faltan_datos; track d) {
+              <li>{{ d }}</li>
+            }
+          </ul>
+        </section>
+      }
+
+      <!-- indicadores -->
+      <section class="cifras">
+        <div class="cifra">
+          <span class="etiqueta">Días con faltante</span>
+          <strong>{{ r.cobertura!.casos_totales }}</strong>
+        </div>
+        <div class="cifra">
+          <span class="etiqueta">Clasificados</span>
+          <strong>{{ r.cobertura!.casos_clasificados }}</strong>
+          <span class="pie">{{ r.cobertura!.cobertura_casos_pct }}% de cobertura</span>
+        </div>
+        <div class="cifra">
+          <span class="etiqueta">Venta perdida</span>
+          <strong>{{ r.cobertura!.venta_perdida_total | number: '1.2-2' }}</strong>
+        </div>
+        <div class="cifra">
+          <span class="etiqueta">Venta perdida explicada</span>
+          <strong>{{ r.cobertura!.venta_perdida_clasificada | number: '1.2-2' }}</strong>
+          <span class="pie">{{ r.cobertura!.cobertura_venta_perdida_pct }}% del impacto</span>
+        </div>
+        <a class="cifra descarga" [href]="urlDescarga()" download>
+          <span class="etiqueta">Excel de resultados</span>
+          <strong>Descargar</strong>
+          <span class="pie">5 hojas · {{ r.nombre_salida }}</span>
+        </a>
+      </section>
+
+      <!-- pareto -->
+      <div class="dos">
+        <section class="tarjeta">
+          <h2>Pareto por causa raíz</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Causa</th>
+                <th class="num">Días</th>
+                <th class="num">Venta perdida</th>
+                <th class="num">%</th>
+                <th>Responsable</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of r.por_causa; track c.root_cause_id) {
+                <tr>
+                  <td>
+                    <span class="chip" [style.background]="color(c.root_cause_id)">{{
+                      c.root_cause_id
+                    }}</span>
+                    {{ c.causa }}
+                  </td>
+                  <td class="num">{{ c.dias }}</td>
+                  <td class="num">{{ c.venta_perdida | number: '1.2-2' }}</td>
+                  <td class="num">
+                    <div class="barra-pct"><span [style.width.%]="c.pct"></span></div>
+                    {{ c.pct }}%
+                  </td>
+                  <td>{{ c.responsable }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </section>
+
+        <section class="tarjeta">
+          <h2>Pareto por responsable</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Responsable</th>
+                <th class="num">Días</th>
+                <th class="num">Venta perdida</th>
+                <th class="num">%</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (x of r.por_responsable; track x.responsable) {
+                <tr>
+                  <td>{{ x.responsable }}</td>
+                  <td class="num">{{ x.dias }}</td>
+                  <td class="num">{{ x.venta_perdida | number: '1.2-2' }}</td>
+                  <td class="num">
+                    <div class="barra-pct"><span [style.width.%]="x.pct"></span></div>
+                    {{ x.pct }}%
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </section>
+      </div>
+
+      <!-- proveedor -->
+      @if (r.proveedores?.length) {
+        <section class="tarjeta">
+          <h2>Cumplimiento del proveedor en CEDIS</h2>
+          <p class="nota">
+            Confirmado = cajas de cita sobre cajas pedidas. Cumplimiento = entregado sobre
+            confirmado. Efectivo = entregado sobre pedido. Las tres se miden sobre los pedidos que
+            sí tienen cita; los que no la tienen van aparte.
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Proveedor</th>
+                <th class="num">Pedidos</th>
+                <th class="num">Cajas ped.</th>
+                <th class="num">Surtido</th>
+                <th class="num">Citas</th>
+                <th class="num">Sin cita</th>
+                <th class="num">Confirmado</th>
+                <th class="num">Cumplimiento</th>
+                <th class="num">Efectivo</th>
+                <th class="num">Citas falladas</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (p of r.proveedores; track p.proveedor_id) {
+                <tr>
+                  <td>{{ p.nombre || p.proveedor_id }}</td>
+                  <td class="num">{{ p.pedidos }}</td>
+                  <td class="num">{{ p.cajas_pedidas }}</td>
+                  <td class="num" [class]="semaforo(p.pct_surtido_pedido)">
+                    {{ p.pct_surtido_pedido | percent: '1.1-1' }}
+                  </td>
+                  <td class="num">{{ p.citas }}</td>
+                  <td class="num" [class.medio]="p.pedidos_sin_cita > 0">
+                    {{ p.pedidos_sin_cita }}
+                  </td>
+                  <td class="num">{{ p.pct_confirmado | percent: '1.1-1' }}</td>
+                  <td class="num">{{ p.pct_cumplimiento | percent: '1.1-1' }}</td>
+                  <td class="num" [class]="semaforo(p.pct_efectivo)">
+                    {{ p.pct_efectivo | percent: '1.1-1' }}
+                  </td>
+                  <td class="num">{{ p.citas_incumplidas }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+
+          @if (r.por_subcausa?.length) {
+            <h3>Qué falla del proveedor costó más</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Falla</th>
+                  <th class="num">Días</th>
+                  <th class="num">Venta perdida</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (s of r.por_subcausa; track s.subcausa) {
+                  <tr>
+                    <td>{{ s.subcausa }}</td>
+                    <td class="num">{{ s.dias }}</td>
+                    <td class="num">{{ s.venta_perdida | number: '1.2-2' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        </section>
+      }
+
+      <!-- qué faltó -->
+      @if (r.cobertura!.bloqueos.length) {
+        <section class="tarjeta">
+          <h2>Qué dato bloqueó la clasificación</h2>
+          <p class="nota">
+            El campo que más se repite es el que más caro está saliendo. Es la lista para priorizar
+            qué fuente integrar primero.
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Campo faltante</th>
+                <th class="num">Días</th>
+                <th class="num">Venta perdida sin explicar</th>
+                <th>A quién pedírselo</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (b of r.cobertura!.bloqueos; track b.campo) {
+                <tr>
+                  <td><code>{{ b.campo }}</code></td>
+                  <td class="num">{{ b.dias }}</td>
+                  <td class="num">{{ b.venta_perdida | number: '1.2-2' }}</td>
+                  <td>{{ b.a_quien }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </section>
+      }
+
+      <!-- detalle -->
+      <section class="tarjeta">
+        <button class="btn-plano" (click)="verDetalle.set(!verDetalle())">
+          {{ verDetalle() ? 'Ocultar' : 'Ver' }} detalle por SKU-tienda, fuentes y advertencias
+        </button>
+
+        @if (verDetalle()) {
+          <h3>Por SKU y tienda, ordenado por impacto</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Tienda</th>
+                <th class="num">Días</th>
+                <th class="num">Cobertura</th>
+                <th class="num">Venta perdida</th>
+                <th class="num">OSA prom.</th>
+                <th>Causa dominante</th>
+                <th>Responsable</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (s of r.por_sku_tienda; track s.sku + s.tienda) {
+                <tr>
+                  <td><code>{{ s.sku }}</code></td>
+                  <td>{{ s.tienda }}</td>
+                  <td class="num">{{ s.dias_clasificados }}/{{ s.dias_con_faltante }}</td>
+                  <td class="num" [class.medio]="s.cobertura_pct < 100">{{ s.cobertura_pct }}%</td>
+                  <td class="num">{{ s.venta_perdida | number: '1.2-2' }}</td>
+                  <td class="num">{{ s.osa_promedio }}</td>
+                  <td>
+                    <span class="chip" [style.background]="color(s.root_cause_id)">{{
+                      s.root_cause_id
+                    }}</span>
+                    {{ s.causa }}
+                  </td>
+                  <td>{{ s.responsable }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+
+          @if (r.citas_falladas?.length) {
+            <h3>Citas en las que el proveedor entregó de menos</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Proveedor</th>
+                  <th>Pedido</th>
+                  <th>Cita</th>
+                  <th>Fecha</th>
+                  <th class="num">Confirmó</th>
+                  <th class="num">Entregó</th>
+                  <th class="num">Faltaron</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (c of r.citas_falladas; track c.folio_cita) {
+                  <tr>
+                    <td>{{ c.proveedor }}</td>
+                    <td><code>{{ c.folio }}</code></td>
+                    <td><code>{{ c.folio_cita }}</code></td>
+                    <td>{{ c.fecha_cita }}</td>
+                    <td class="num">{{ c.confirmadas }}</td>
+                    <td class="num">{{ c.entregadas }}</td>
+                    <td class="num mal">{{ c.faltantes }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+
+          <h3>Fuentes leídas</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Hoja</th>
+                <th class="num">Filas</th>
+                <th>Desde</th>
+                <th>Hasta</th>
+                <th>Equipo</th>
+                <th>Owner</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (f of r.fuentes; track f.hoja) {
+                <tr [class.fila-mal]="f.filas === 0">
+                  <td><code>{{ f.hoja }}</code></td>
+                  <td class="num">{{ f.filas }}</td>
+                  <td>{{ f.desde }}</td>
+                  <td>{{ f.hasta }}</td>
+                  <td>{{ f.equipo }}</td>
+                  <td>{{ f.owner }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+
+          @if (r.advertencias?.length) {
+            <h3>Advertencias de lectura</h3>
+            <ul class="lista medio">
+              @for (a of r.advertencias; track a) {
+                <li>{{ a }}</li>
+              }
+            </ul>
+          }
+        }
+      </section>
+    }
+  }
+</main>
