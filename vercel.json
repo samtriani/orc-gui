@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist/web/browser",
+  "framework": "angular",
+  "rewrites": [
+    { "source": "/api/:ruta*", "destination": "https://orc-api.fly.dev/api/:ruta*" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
