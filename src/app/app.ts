@@ -4,6 +4,28 @@ import { Analisis, Orcmm } from './orcmm';
 
 type Paso = 'inicio' | 'trabajando' | 'bloqueado' | 'listo' | 'sin-datos' | 'error';
 
+/**
+ * INTERRUPTOR TEMPORAL — avisos de SIMA en pantalla.
+ *
+ * Mientras SIMA no entrega los pedidos de tienda, el backend acompaña cada
+ * resultado con el aviso de que la prioridad 3 está apagada y el análisis es
+ * parcial. Es correcto, pero hoy estorba en pantalla.
+ *
+ * En true, la pantalla no muestra ni el aviso de análisis parcial ni las
+ * líneas de SIMA en las listas de datos faltantes y advertencias.
+ *
+ * OJO, lo que esto NO cambia:
+ *   - El análisis sigue siendo parcial. RC03 'Pedido No Generado' sigue sin
+ *     poder aparecer, y sus días se siguen repartiendo entre RC04, RC05 y
+ *     RC06. Sólo se dejó de decir en pantalla.
+ *   - El Excel que se descarga SÍ trae el aviso en rojo, en tres hojas. Se
+ *     apaga desde el backend con EVALUAR_PEDIDO_TIENDA = True, cuando lleguen
+ *     los datos.
+ *
+ * Para volver a mostrarlo: poner false.
+ */
+const OCULTAR_AVISOS_SIMA = true;
+
 /** Colores de la matriz, los mismos del Excel de resultados. */
 const COLOR_CAUSA: Record<string, string> = {
   RC01: '#DDEBF7',
@@ -41,6 +63,30 @@ export class App {
     const r = this.resultado();
     return r?.estado === 'ok' ? this.api.urlDescarga(r.id) : null;
   });
+
+  // -- avisos, filtrados por el interruptor de SIMA ------------------------
+  //
+  // El backend manda todo; aquí sólo se decide qué se enseña. Así el día que
+  // se apague el interruptor no hay que tocar el backend ni volver a correr
+  // nada: los mensajes ya venían en la respuesta.
+
+  readonly avisoParcial = computed(() =>
+    OCULTAR_AVISOS_SIMA ? null : (this.resultado()?.aviso_parcial ?? null),
+  );
+
+  readonly faltanDatos = computed(() =>
+    this.sinSima(this.resultado()?.validacion?.faltan_datos),
+  );
+
+  readonly advertencias = computed(() => this.sinSima(this.resultado()?.advertencias));
+
+  /** Quita las líneas que hablan de SIMA, dejando el resto intacto.
+   *  Se filtra por el nombre de la hoja, que es como el backend las nombra. */
+  private sinSima(lineas: string[] | undefined): string[] {
+    const todas = lineas ?? [];
+    if (!OCULTAR_AVISOS_SIMA) return todas;
+    return todas.filter((l) => !l.includes('SIMA'));
+  }
 
   // -- selección de archivo ------------------------------------------------
 
@@ -119,5 +165,11 @@ export class App {
     return tasa >= 0.8 ? 'medio' : 'mal';
   }
 
-  fuentesVacias = computed(() => (this.resultado()?.fuentes ?? []).filter((f) => f.filas === 0));
+  /** Una hoja vacía se pinta en rojo en la tabla de fuentes. La de SIMA no,
+   *  mientras su ausencia sea esperada: dejarla roja contradiría el resto de
+   *  la pantalla, donde ya no se dice nada al respecto. */
+  fuenteEnRojo(hoja: string, filas: number): boolean {
+    if (filas > 0) return false;
+    return !(OCULTAR_AVISOS_SIMA && hoja.includes('SIMA'));
+  }
 }

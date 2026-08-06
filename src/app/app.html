@@ -58,10 +58,10 @@
           }
         </ul>
 
-        @if (r.validacion.faltan_datos.length) {
+        @if (faltanDatos().length) {
           <h3>Datos incompletos · no bloquean</h3>
           <ul class="lista medio">
-            @for (d of r.validacion.faltan_datos; track d) {
+            @for (d of faltanDatos(); track d) {
               <li>{{ d }}</li>
             }
           </ul>
@@ -117,7 +117,7 @@
 
     <!-- =========================== RESULTADO =========================== -->
     @if (paso() === 'listo' && r.cobertura; as _) {
-      @if (r.aviso_parcial; as aviso) {
+      @if (avisoParcial(); as aviso) {
         <p class="aviso mal grande">{{ aviso }}</p>
       }
 
@@ -128,7 +128,7 @@
         </p>
       }
 
-      @if (r.validacion.faltan_datos.length) {
+      @if (faltanDatos().length) {
         <section class="tarjeta">
           <h2>Fuentes que no llegaron completas</h2>
           <p class="nota">
@@ -136,7 +136,7 @@
             reporta abajo qué días se quedaron sin explicar por esto.
           </p>
           <ul class="lista medio">
-            @for (d of r.validacion.faltan_datos; track d) {
+            @for (d of faltanDatos(); track d) {
               <li>{{ d }}</li>
             }
           </ul>
@@ -423,7 +423,7 @@
             </thead>
             <tbody>
               @for (f of r.fuentes; track f.hoja) {
-                <tr [class.fila-mal]="f.filas === 0">
+                <tr [class.fila-mal]="fuenteEnRojo(f.hoja, f.filas)">
                   <td><code>{{ f.hoja }}</code></td>
                   <td class="num">{{ f.filas }}</td>
                   <td>{{ f.desde }}</td>
@@ -435,10 +435,10 @@
             </tbody>
           </table>
 
-          @if (r.advertencias?.length) {
+          @if (advertencias().length) {
             <h3>Advertencias de lectura</h3>
             <ul class="lista medio">
-              @for (a of r.advertencias; track a) {
+              @for (a of advertencias(); track a) {
                 <li>{{ a }}</li>
               }
             </ul>
