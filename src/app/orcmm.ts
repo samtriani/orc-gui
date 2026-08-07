@@ -7,7 +7,8 @@
  */
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, timer } from 'rxjs';
+import { map, switchMap, takeWhile } from 'rxjs/operators';
 
 export interface Validacion {
   /** Layout roto: el modelo leería mal. Bloquean. */
@@ -41,7 +42,56 @@ export interface Cobertura {
   venta_perdida_total: number;
   venta_perdida_clasificada: number;
   cobertura_venta_perdida_pct: number;
+
+  /** Alcance = los días cuyo SKU sí está en el catálogo de la tienda.
+   *  BOPS puede entregar SKU de divisiones que este análisis no cubre; esos
+   *  días no son un dato faltante, son días que no le tocaba explicar. La
+   *  portada encabeza con la cobertura del alcance y deja la global como
+   *  contraste: una mide al modelo, la otra mide la extracción. */
+  casos_fuera_de_alcance: number;
+  venta_perdida_fuera_de_alcance: number;
+  casos_en_alcance: number;
+  cobertura_casos_alcance_pct: number;
+  venta_perdida_en_alcance: number;
+  cobertura_venta_perdida_alcance_pct: number;
+
   bloqueos: Bloqueo[];
+}
+
+/** Un escalón del waterfall: cuántos puntos de OSA quitó esa causa. */
+export interface Escalon {
+  root_cause_id: string;
+  causa: string;
+  responsable: string;
+  dias: number;
+  puntos_osa: number;
+}
+
+/** De 100% al OSA real, en puntos porcentuales.
+ *
+ *  Es un reparto distinto al del Pareto: éste reparte el GAP DE OSA y el
+ *  Pareto reparte la VENTA PERDIDA. Un día con faltante pesa igual que
+ *  cualquier otro para el OSA, valga lo que valga en pesos, así que los dos
+ *  órdenes pueden no coincidir. */
+export interface Waterfall {
+  osa_teorico: number;
+  osa_real: number | null;
+  universo_filas: number;
+  escalones: Escalon[];
+}
+
+/** El cumplimiento del proveedor agregado, para la cifra de portada. */
+export interface FillRate {
+  proveedores: number;
+  pedidos: number;
+  citas: number;
+  pedidos_sin_cita: number;
+  cajas_pedidas: number;
+  cajas_confirmadas: number;
+  cajas_entregadas: number;
+  pct_efectivo: number | null;
+  pct_cumplimiento: number | null;
+  pct_confirmado: number | null;
 }
 
 export interface FilaCausa {
@@ -113,11 +163,15 @@ export interface Correccion {
   errores_que_siguen: string[];
 }
 
-/** Respuesta de /api/analizar. Los bloques del resumen sólo vienen con estado 'ok'. */
+/** Respuesta de /api/analizar/{id}. Los bloques del resumen sólo vienen con
+ *  estado 'ok'; mientras corre, sólo llegan `estado` y `segundos`. */
 export interface Analisis {
   id: string;
   archivo: string;
-  estado: 'ok' | 'bloqueado' | 'sin_datos';
+  estado: 'en_proceso' | 'ok' | 'bloqueado' | 'sin_datos';
+
+  /** Sólo en 'en_proceso': cuánto lleva corriendo. */
+  segundos?: number;
 
   // estado 'bloqueado'
   valido?: boolean;
@@ -130,9 +184,12 @@ export interface Analisis {
 
   validacion: Validacion;
   correccion?: Correccion | null;
-  /** % de OSA real del periodo: sobre TODAS las filas de BOPS_OSA, no sólo
-   *  los días con faltante. Es la foto general antes de entrar a la causa
-   *  raíz de cada día. Viene en estado 'ok' y 'sin_datos'. */
+  /** OSA del periodo sobre los SKU que sí le tocan al análisis (los del
+   *  catálogo de la tienda). Es el número de portada. */
+  osa_alcance?: number | null;
+  /** OSA sobre TODAS las filas de BOPS_OSA. Cuando el export trae divisiones
+   *  fuera del alcance, este número se hunde por SKU que el catálogo ni
+   *  conoce: mide la extracción, no la disponibilidad. */
   osa_general?: number | null;
   aviso_parcial?: string | null;
   advertencias?: string[];
@@ -141,6 +198,8 @@ export interface Analisis {
   // estado 'ok'
   nombre_salida?: string;
   umbral_osa?: number;
+  waterfall?: Waterfall;
+  fill_rate_proveedor?: FillRate;
   cobertura?: Cobertura;
   por_causa?: FilaCausa[];
   por_responsable?: FilaResponsable[];
@@ -151,20 +210,56 @@ export interface Analisis {
   discrepancias?: { folio: string; sku: string; motivos: string }[];
 }
 
+/** Lo que responde POST /api/analizar: sólo el acuse con el id. */
+interface Encolado {
+  id: string;
+  archivo: string;
+  estado: 'en_proceso';
+}
+
+/** Cada cuánto se le pregunta al backend si ya terminó. El análisis del layout
+ *  completo tarda un par de minutos, así que preguntar más seguido sólo suma
+ *  peticiones sin adelantar nada. */
+const ESPERA_MS = 3000;
+
 @Injectable({ providedIn: 'root' })
 export class Orcmm {
   private readonly http = inject(HttpClient);
   private readonly base = '/api';
 
-  /** El umbral de OSA no se expone en la pantalla: se queda en el 100 que trae
-   *  el backend por omisión, o sea todo día que no esté al 100% de
-   *  disponibilidad. Quien lo quiera mover, lo mueve por API o por CLI. */
-  analizar(archivo: File, corregir: boolean): Observable<Analisis> {
+  /**
+   * Sube el paquete y sigue el análisis hasta que termina.
+   *
+   * El backend no analiza dentro del request: con el volumen real la corrida
+   * tarda minutos y un request abierto tanto tiempo se lo lleva cualquier
+   * proxy de por medio. Responde un id y aquí se hace poll hasta que el
+   * estado deja de ser 'en_proceso'. Para quien llama, sigue siendo un solo
+   * Observable que emite el avance y termina con el resultado.
+   *
+   * `archivos` es el .xlsx del layout más los CSV de las hojas que ya no
+   * caben en una hoja de Excel, o un .zip con todo dentro.
+   *
+   * El umbral de OSA no se expone en la pantalla: se queda en el 100 que trae
+   * el backend por omisión, o sea todo día que no esté al 100% de
+   * disponibilidad. Quien lo quiera mover, lo mueve por API o por CLI.
+   */
+  analizar(archivos: File[], corregir: boolean, forzar = false): Observable<Analisis> {
     const cuerpo = new FormData();
-    cuerpo.append('archivo', archivo, archivo.name);
-    return this.http.post<Analisis>(`${this.base}/analizar`, cuerpo, {
-      params: { corregir },
-    });
+    for (const a of archivos) cuerpo.append('archivos', a, a.name);
+
+    return this.http
+      .post<Encolado>(`${this.base}/analizar`, cuerpo, { params: { corregir, forzar } })
+      .pipe(
+        switchMap((encolado) =>
+          timer(0, ESPERA_MS).pipe(
+            switchMap(() => this.http.get<Analisis>(`${this.base}/analizar/${encolado.id}`)),
+            // El id no viene en la respuesta mientras corre; se conserva el
+            // del acuse para que la descarga lo tenga siempre.
+            map((estado) => ({ ...estado, id: encolado.id })),
+            takeWhile((estado) => estado.estado === 'en_proceso', true),
+          ),
+        ),
+      );
   }
 
   urlDescarga(id: string): string {

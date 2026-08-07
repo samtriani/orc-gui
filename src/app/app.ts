@@ -47,11 +47,21 @@ export class App {
   private readonly api = inject(Orcmm);
 
   readonly paso = signal<Paso>('inicio');
-  readonly archivo = signal<File | null>(null);
+  readonly archivos = signal<File[]>([]);
   readonly resultado = signal<Analisis | null>(null);
   readonly error = signal<string | null>(null);
   readonly arrastrando = signal(false);
   readonly verDetalle = signal(false);
+  /** Cuánto lleva corriendo el análisis, según el backend. */
+  readonly segundos = signal(0);
+
+  readonly nombrePaquete = computed(() => {
+    const a = this.archivos();
+    if (!a.length) return '';
+    const layout = a.find((f) => f.name.toLowerCase().endsWith('.xlsx')) ?? a[0];
+    const resto = a.length - 1;
+    return resto > 0 ? `${layout.name} + ${resto} archivo${resto > 1 ? 's' : ''}` : layout.name;
+  });
 
   /** El archivo trae errores de layout pero la corrección automática los quita. */
   readonly ofreceCorreccion = computed(() => {
@@ -92,13 +102,13 @@ export class App {
 
   elegir(evento: Event): void {
     const input = evento.target as HTMLInputElement;
-    this.tomar(input.files?.[0] ?? null);
+    this.tomar(input.files);
   }
 
   soltar(evento: DragEvent): void {
     evento.preventDefault();
     this.arrastrando.set(false);
-    this.tomar(evento.dataTransfer?.files?.[0] ?? null);
+    this.tomar(evento.dataTransfer?.files ?? null);
   }
 
   sobrevolar(evento: DragEvent, dentro: boolean): void {
@@ -106,29 +116,74 @@ export class App {
     this.arrastrando.set(dentro);
   }
 
-  private tomar(archivo: File | null): void {
-    if (!archivo) return;
-    if (!archivo.name.toLowerCase().endsWith('.xlsx')) {
-      this.error.set('El archivo tiene que ser el .xlsx de captura ORCMM.');
-      this.paso.set('error');
+  /**
+   * La captura son varios archivos desde el layout V5: el .xlsx más los CSV
+   * de las hojas que ya no caben en una hoja de Excel, o un .zip con todo.
+   *
+   * Se revisa aquí lo mismo que revisa el backend, para no gastar una subida
+   * de cientos de MB en un paquete que va a rebotar.
+   */
+  private tomar(lista: FileList | null): void {
+    const archivos = Array.from(lista ?? []);
+    if (!archivos.length) return;
+
+    const nombre = (f: File) => f.name.toLowerCase();
+    const malos = archivos.filter((f) => !/\.(xlsx|csv|zip)$/.test(nombre(f)));
+    if (malos.length) {
+      this.fallar(
+        `Sólo se aceptan .xlsx (el layout), .csv (las fuentes grandes) o un .zip con ` +
+          `todo dentro. Sobra: ${malos.map((f) => f.name).join(', ')}.`,
+      );
       return;
     }
-    this.archivo.set(archivo);
+
+    const layouts = archivos.filter((f) => nombre(f).endsWith('.xlsx'));
+    const zips = archivos.filter((f) => nombre(f).endsWith('.zip'));
+
+    if (layouts.length > 1) {
+      this.fallar(
+        `Llegaron ${layouts.length} archivos .xlsx y sólo puede haber un layout: ` +
+          `${layouts.map((f) => f.name).join(', ')}.`,
+      );
+      return;
+    }
+    if (!layouts.length && !zips.length) {
+      this.fallar('Falta el .xlsx del layout de captura (o el .zip que lo contenga).');
+      return;
+    }
+
+    this.archivos.set(archivos);
     this.error.set(null);
     this.analizar(false);
   }
 
+  private fallar(mensaje: string): void {
+    this.error.set(mensaje);
+    this.paso.set('error');
+  }
+
   // -- análisis ------------------------------------------------------------
 
-  analizar(corregir: boolean): void {
-    const archivo = this.archivo();
-    if (!archivo) return;
+  /**
+   * `forzar` deja correr el análisis aunque queden errores que la corrección
+   * automática no puede arreglar. Sirve cuando lo roto es una hoja de la que
+   * depende sólo una parte del reporte: una extracción de citas incompleta
+   * afecta al scorecard del proveedor, no al Pareto.
+   */
+  analizar(corregir: boolean, forzar = false): void {
+    const archivos = this.archivos();
+    if (!archivos.length) return;
 
     this.paso.set('trabajando');
     this.error.set(null);
+    this.segundos.set(0);
 
-    this.api.analizar(archivo, corregir).subscribe({
+    this.api.analizar(archivos, corregir, forzar).subscribe({
       next: (r) => {
+        if (r.estado === 'en_proceso') {
+          this.segundos.set(r.segundos ?? 0);
+          return;
+        }
         this.resultado.set(r);
         this.paso.set(
           r.estado === 'ok' ? 'listo' : r.estado === 'sin_datos' ? 'sin-datos' : 'bloqueado',
@@ -145,11 +200,48 @@ export class App {
   }
 
   reiniciar(): void {
-    this.archivo.set(null);
+    this.archivos.set([]);
     this.resultado.set(null);
     this.error.set(null);
     this.verDetalle.set(false);
+    this.segundos.set(0);
     this.paso.set('inicio');
+  }
+
+  // -- portada ejecutiva ---------------------------------------------------
+
+  /** Hay días de BOPS que el catálogo de la tienda no reconoce. Cuando pasa,
+   *  la portada tiene que decir sobre qué universo está hablando. */
+  readonly hayFueraDeAlcance = computed(
+    () => (this.resultado()?.cobertura?.casos_fuera_de_alcance ?? 0) > 0,
+  );
+
+  /** SKU distintos con faltante dentro del alcance. Sale del detalle por
+   *  SKU-tienda, que ya viene filtrado al alcance desde el backend. */
+  readonly skusConGap = computed(
+    () => new Set((this.resultado()?.por_sku_tienda ?? []).map((s) => s.sku)).size,
+  );
+
+  /** El escalón más grande del waterfall, para escalar las barras. Sin esto,
+   *  con 12.28 pp contra 0.01 pp las chicas no se verían. */
+  private readonly escalonMayor = computed(() =>
+    Math.max(...(this.resultado()?.waterfall?.escalones ?? []).map((e) => e.puntos_osa), 0.01),
+  );
+
+  anchoEscalon(puntos: number): string {
+    return `${Math.max((puntos / this.escalonMayor()) * 100, 1.5)}%`;
+  }
+
+  /** Top de SKU por impacto para la portada. El listado completo vive en el
+   *  detalle; aquí sólo caben los que mueven la aguja. */
+  readonly topSkus = computed(() => (this.resultado()?.por_sku_tienda ?? []).slice(0, 6));
+
+  private readonly ventaMayor = computed(() =>
+    Math.max(...this.topSkus().map((s) => s.venta_perdida), 1),
+  );
+
+  anchoSku(venta: number): string {
+    return `${Math.max((venta / this.ventaMayor()) * 100, 2)}%`;
   }
 
   // -- ayudas de presentación ---------------------------------------------
