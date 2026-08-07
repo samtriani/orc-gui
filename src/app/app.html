@@ -22,9 +22,22 @@
         (dragleave)="sobrevolar($event, false)"
         (drop)="soltar($event)"
       >
-        <input type="file" accept=".xlsx" (change)="elegir($event)" hidden />
-        <strong>Arrastra aquí el Excel de captura</strong>
-        <span>o haz clic para buscarlo · sólo .xlsx</span>
+        <input
+          type="file"
+          accept=".xlsx,.csv,.zip"
+          multiple
+          (change)="elegir($event)"
+          hidden
+        />
+        <strong>Arrastra aquí la captura completa</strong>
+        <span>
+          el <b>.xlsx</b> del layout junto con los <b>.csv</b> de Tableau, o un
+          <b>.zip</b> con todo dentro
+        </span>
+        <span class="pista">
+          El zip es lo más rápido: esos CSV pesan cientos de MB sueltos y menos de
+          cuarenta comprimidos.
+        </span>
       </label>
 
       @if (error(); as e) {
@@ -37,7 +50,17 @@
   @if (paso() === 'trabajando') {
     <section class="tarjeta centro">
       <div class="girando"></div>
-      <p>Validando el layout y clasificando los días con faltante…</p>
+      <p>Validando la captura y clasificando los días con faltante…</p>
+      <p class="nota">
+        {{ nombrePaquete() }}
+        @if (segundos()) {
+          · {{ segundos() | number: '1.0-0' }} s
+        }
+      </p>
+      <p class="nota">
+        Con la captura completa son millones de filas: la corrida tarda un par de
+        minutos. Se puede dejar la pestaña abierta.
+      </p>
     </section>
   }
 
@@ -99,10 +122,24 @@
             <button class="btn" (click)="analizar(true)">Corregir y analizar</button>
           </div>
         } @else {
-          <p class="aviso mal">
-            Estos errores no se pueden corregir automáticamente. Hay que pedirle la corrección al
-            equipo dueño de la hoja.
-          </p>
+          <div class="caja-accion">
+            <div>
+              <strong>Estos errores no se pueden corregir automáticamente.</strong>
+              <p class="nota">
+                No son de formato: son datos que faltan o que no cuadran entre hojas, y eso no se
+                puede inventar. Hay que pedirle la reextracción al equipo dueño de la fuente.
+              </p>
+              <p class="nota">
+                Se puede analizar de todos modos si lo que está roto es una hoja de la que depende
+                sólo una parte del reporte — una extracción de citas incompleta afecta al
+                cumplimiento del proveedor, no al Pareto por causa raíz. El resultado hay que
+                leerlo sabiendo eso.
+              </p>
+            </div>
+            <button class="btn plano" (click)="analizar(false, true)">
+              Analizar de todos modos
+            </button>
+          </div>
         }
       </section>
     }
@@ -128,37 +165,127 @@
         </p>
       }
 
-      <!-- vista general: la foto completa antes de entrar al detalle -->
+      <!-- ===================== PORTADA EJECUTIVA =====================
+           El resultado y, enseguida, la brecha explicada por causa. El
+           detalle viene después: general primero, particular al final. -->
       <section class="cifras">
         <div class="cifra">
-          <span class="etiqueta">OSA general del periodo</span>
-          <strong>{{ r.osa_general }}%</strong>
-          <span class="pie">Todas las tiendas y SKU, no sólo los días con faltante</span>
+          <span class="etiqueta">OSA del periodo</span>
+          <strong>{{ r.osa_alcance }}%</strong>
+          <span class="pie">
+            @if (hayFueraDeAlcance()) {
+              Sobre los SKU del catálogo de la tienda
+            } @else {
+              Todos los SKU y días leídos
+            }
+          </span>
         </div>
         <div class="cifra">
-          <span class="etiqueta">Días con faltante</span>
-          <strong>{{ r.cobertura!.casos_totales }}</strong>
+          <span class="etiqueta">SKU con gap</span>
+          <strong>{{ skusConGap() | number }}</strong>
+          <span class="pie">con al menos un día de faltante</span>
         </div>
         <div class="cifra">
-          <span class="etiqueta">Clasificados</span>
-          <strong>{{ r.cobertura!.casos_clasificados }}</strong>
-          <span class="pie">{{ r.cobertura!.cobertura_casos_pct }}% de cobertura</span>
+          <span class="etiqueta">Días SKU con gap</span>
+          <strong>{{ r.cobertura!.casos_en_alcance | number }}</strong>
+          <span class="pie">{{ r.cobertura!.cobertura_casos_alcance_pct }}% explicados</span>
         </div>
         <div class="cifra">
           <span class="etiqueta">Venta perdida</span>
-          <strong>{{ r.cobertura!.venta_perdida_total | number: '1.2-2' }}</strong>
+          <strong>{{ r.cobertura!.venta_perdida_en_alcance | number: '1.0-0' }}</strong>
+          <span class="pie">
+            {{ r.cobertura!.cobertura_venta_perdida_alcance_pct }}% explicada
+          </span>
         </div>
-        <div class="cifra">
-          <span class="etiqueta">Venta perdida explicada</span>
-          <strong>{{ r.cobertura!.venta_perdida_clasificada | number: '1.2-2' }}</strong>
-          <span class="pie">{{ r.cobertura!.cobertura_venta_perdida_pct }}% del impacto</span>
-        </div>
+        @if (r.fill_rate_proveedor?.pct_efectivo; as fr) {
+          <div class="cifra">
+            <span class="etiqueta">Fill rate proveedor</span>
+            <strong>{{ fr }}%</strong>
+            <span class="pie">cajas entregadas sobre pedidas con cita</span>
+          </div>
+        }
         <a class="cifra descarga" [href]="urlDescarga()" download>
           <span class="etiqueta">Excel de resultados</span>
           <strong>Descargar</strong>
           <span class="pie">5 hojas · {{ r.nombre_salida }}</span>
         </a>
       </section>
+
+      @if (hayFueraDeAlcance()) {
+        <p class="aviso medio">
+          BOPS entregó {{ r.cobertura!.casos_totales | number }} días con faltante, de los
+          cuales <b>{{ r.cobertura!.casos_fuera_de_alcance | number }}</b> son de SKU que el
+          catálogo de la tienda no reconoce y quedan fuera del análisis. Sobre todo lo que
+          entregó BOPS el OSA sería {{ r.osa_general }}%; ese número mide la extracción, no la
+          disponibilidad. Si el export debería venir filtrado a la división del catálogo, hay
+          que pedirlo así.
+        </p>
+      }
+
+      <!-- waterfall: de 100% al OSA real, en puntos -->
+      @if (r.waterfall?.escalones?.length) {
+        <section class="tarjeta">
+          <h2>Dónde se pierde la disponibilidad</h2>
+          <p class="nota">
+            Cuántos puntos de OSA quitó cada causa. No es el Pareto de pesos: aquí un día con
+            faltante pesa igual que cualquier otro, valga lo que valga.
+          </p>
+
+          <div class="agua">
+            <div class="agua-fila extremo">
+              <span class="agua-eti">OSA teórico</span>
+              <span class="agua-barra"></span>
+              <span class="agua-val">{{ r.waterfall!.osa_teorico }}%</span>
+            </div>
+            @for (e of r.waterfall!.escalones; track e.root_cause_id) {
+              <div class="agua-fila">
+                <span class="agua-eti" [title]="e.responsable">
+                  {{ e.root_cause_id }} · {{ e.causa }}
+                </span>
+                <span class="agua-barra">
+                  <i
+                    [style.width]="anchoEscalon(e.puntos_osa)"
+                    [style.background]="color(e.root_cause_id)"
+                  ></i>
+                </span>
+                <span class="agua-val">
+                  −{{ e.puntos_osa | number: '1.2-2' }} pp
+                  <small>{{ e.dias | number }} días</small>
+                </span>
+              </div>
+            }
+            <div class="agua-fila extremo final">
+              <span class="agua-eti">OSA real del periodo</span>
+              <span class="agua-barra"></span>
+              <span class="agua-val">{{ r.waterfall!.osa_real }}%</span>
+            </div>
+          </div>
+        </section>
+      }
+
+      <!-- top de SKU por impacto -->
+      @if (topSkus().length) {
+        <section class="tarjeta">
+          <h2>SKU que más costaron</h2>
+          <div class="agua">
+            @for (s of topSkus(); track s.sku + s.tienda) {
+              <div class="agua-fila">
+                <span class="agua-eti">
+                  {{ s.sku }}
+                  <small>tienda {{ s.tienda }} · {{ s.dias_con_faltante }} días</small>
+                </span>
+                <span class="agua-barra">
+                  <i [style.width]="anchoSku(s.venta_perdida)" [style.background]="color(s.root_cause_id)"></i>
+                </span>
+                <span class="agua-val">
+                  {{ s.venta_perdida | number: '1.0-0' }}
+                  <small>{{ s.causa }}</small>
+                </span>
+              </div>
+            }
+          </div>
+        </section>
+      }
 
       <!-- de lo general a lo particular: aquí empieza el detalle -->
       @if (faltanDatos().length) {
