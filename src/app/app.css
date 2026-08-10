@@ -469,3 +469,182 @@ tr.fila-mal td {
   max-width: 42ch;
   text-align: center;
 }
+
+/* ------------------------------ filtros ------------------------------- */
+/*
+   La barra se queda pegada arriba: con las tablas paginadas uno baja a la
+   página 7 del detalle y necesita cambiar el filtro sin volver a subir.
+*/
+.filtros {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  border-color: var(--acento);
+}
+.filtros-fila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 150px;
+}
+.campo.ancho {
+  flex: 2 1 260px;
+}
+.campo > span {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--tinta-suave);
+}
+.campo input,
+.campo select {
+  font: inherit;
+  color: inherit;
+  padding: 7px 9px;
+  border: 1px solid var(--linea);
+  border-radius: 6px;
+  background: #fff;
+  min-width: 0;
+}
+.campo input:focus,
+.campo select:focus {
+  outline: 2px solid var(--acento);
+  outline-offset: -1px;
+}
+.limpiar {
+  flex: 0 0 auto;
+  padding: 7px 14px;
+}
+
+/* -------- ficha del SKU buscado -------- */
+.ficha {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--acento-suave);
+  border: 1px solid var(--acento);
+}
+.ficha-cab {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.ficha-cab code {
+  font-size: 17px;
+  font-weight: 700;
+}
+.ficha-cab span {
+  color: var(--tinta-suave);
+  font-size: 12px;
+}
+.ficha-datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 8px;
+}
+.ficha-datos b {
+  font-size: 16px;
+}
+.ficha-causas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.chip.claro {
+  background: #fff;
+  border: 1px solid var(--linea);
+}
+/* El SKU buscado no salió. No es un error: es información, y por eso va en
+   ámbar y no en rojo. */
+.ficha.vacia {
+  background: var(--medio-fondo);
+  border-color: var(--medio);
+}
+.ficha.vacia p {
+  margin: 8px 0 0;
+  max-width: 90ch;
+}
+.ficha.vacia .pista {
+  font-size: 12px;
+  color: var(--tinta-suave);
+}
+
+/* ---------------------------- paginación ------------------------------ */
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--linea);
+  font-size: 12px;
+  color: var(--tinta-suave);
+}
+.pager-botones {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pager-botones button {
+  font: inherit;
+  min-width: 28px;
+  padding: 4px 8px;
+  border: 1px solid var(--linea);
+  border-radius: 5px;
+  background: #fff;
+  color: var(--tinta);
+  cursor: pointer;
+}
+.pager-botones button:hover:not(:disabled) {
+  border-color: var(--acento);
+  color: var(--acento);
+}
+.pager-botones button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.pager-pos {
+  padding: 0 8px;
+  white-space: nowrap;
+}
+.pager-tam select {
+  font: inherit;
+  padding: 4px 6px;
+  border: 1px solid var(--linea);
+  border-radius: 5px;
+  background: #fff;
+  color: inherit;
+}
+.pager-tam {
+  margin-left: auto;
+}
+
+/* --------------------- filas clicables y vacíos ----------------------- */
+.clicable {
+  cursor: pointer;
+}
+code.clicable:hover,
+.agua-fila.clicable:hover .agua-eti {
+  color: var(--acento);
+  text-decoration: underline;
+}
+td.vacio {
+  text-align: center;
+  padding: 18px;
+  color: var(--tinta-suave);
+}
+h3 .filtrado {
+  margin-left: 10px;
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--acento);
+}

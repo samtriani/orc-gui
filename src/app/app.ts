@@ -1,6 +1,20 @@
 import { DecimalPipe, PercentPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import { Analisis, Orcmm } from './orcmm';
+import { Analisis, CitaFallada, FilaProveedor, FilaSkuTienda, Orcmm } from './orcmm';
+import { Paginador, PaginadorCtrl } from './paginacion';
+
+/** Comparación laxa para los filtros de texto: sin acentos, sin mayúsculas y
+ *  sin espacios de sobra. Se busca un SKU copiado de un Excel, no se hace
+ *  una consulta exacta. */
+function normalizar(s: string): string {
+  return s
+    .normalize('NFD')
+    // Los acentos quedan como caracteres combinantes aparte tras NFD; el rango
+    // va escrito con escapes a propósito, porque literales serían invisibles.
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
 
 type Paso = 'inicio' | 'trabajando' | 'bloqueado' | 'listo' | 'sin-datos' | 'error';
 
@@ -39,7 +53,7 @@ const COLOR_CAUSA: Record<string, string> = {
 
 @Component({
   selector: 'app-root',
-  imports: [DecimalPipe, PercentPipe],
+  imports: [DecimalPipe, PercentPipe, PaginadorCtrl],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
@@ -205,6 +219,7 @@ export class App {
     this.error.set(null);
     this.verDetalle.set(false);
     this.segundos.set(0);
+    this.limpiarFiltros();
     this.paso.set('inicio');
   }
 
@@ -242,6 +257,178 @@ export class App {
 
   anchoSku(venta: number): string {
     return `${Math.max((venta / this.ventaMayor()) * 100, 2)}%`;
+  }
+
+  // ========================================================================
+  // FILTROS
+  // ========================================================================
+  //
+  // Todo se filtra en el navegador, sobre lo que ya trajo la respuesta. No se
+  // vuelve a llamar al backend: las listas más grandes son cientos de
+  // renglones, no miles, y el análisis tarda minutos — refiltrar contra el
+  // servidor sería absurdo.
+
+  readonly filtroSku = signal('');
+  readonly filtroTienda = signal('');
+  readonly filtroCausa = signal('');
+  readonly filtroResponsable = signal('');
+  readonly filtroProveedor = signal('');
+
+  readonly hayFiltro = computed(
+    () =>
+      !!(
+        this.filtroSku().trim() ||
+        this.filtroTienda() ||
+        this.filtroCausa() ||
+        this.filtroResponsable() ||
+        this.filtroProveedor().trim()
+      ),
+  );
+
+  // -- opciones de los desplegables, sacadas de los propios datos ----------
+
+  readonly tiendas = computed(() =>
+    [...new Set((this.resultado()?.por_sku_tienda ?? []).map((s) => s.tienda))].sort(),
+  );
+
+  readonly causas = computed(() => {
+    const vistas = new Map<string, string>();
+    for (const s of this.resultado()?.por_sku_tienda ?? []) vistas.set(s.root_cause_id, s.causa);
+    return [...vistas].map(([id, causa]) => ({ id, causa })).sort((a, b) => a.id.localeCompare(b.id));
+  });
+
+  readonly responsables = computed(() =>
+    [...new Set((this.resultado()?.por_sku_tienda ?? []).map((s) => s.responsable))].sort(),
+  );
+
+  // -- listas filtradas ----------------------------------------------------
+
+  readonly skusFiltrados = computed<FilaSkuTienda[]>(() => {
+    const sku = normalizar(this.filtroSku());
+    const tienda = this.filtroTienda();
+    const causa = this.filtroCausa();
+    const resp = this.filtroResponsable();
+    return (this.resultado()?.por_sku_tienda ?? []).filter(
+      (s) =>
+        (!sku || normalizar(s.sku).includes(sku)) &&
+        (!tienda || s.tienda === tienda) &&
+        (!causa || s.root_cause_id === causa) &&
+        (!resp || s.responsable === resp),
+    );
+  });
+
+  readonly citasFiltradas = computed<CitaFallada[]>(() => {
+    const sku = normalizar(this.filtroSku());
+    const prov = normalizar(this.filtroProveedor());
+    return (this.resultado()?.citas_falladas ?? []).filter(
+      (c) =>
+        (!sku || normalizar(c.sku).includes(sku)) &&
+        (!prov || normalizar(c.proveedor).includes(prov)),
+    );
+  });
+
+  /** El scorecard de proveedor es un agregado del periodo: no tiene columna de
+   *  SKU, así que el filtro de SKU no puede tocarlo sin mentir. Se filtra sólo
+   *  por nombre. Para ver el proveedor de un SKU está la tabla de citas. */
+  readonly proveedoresFiltrados = computed<FilaProveedor[]>(() => {
+    const prov = normalizar(this.filtroProveedor());
+    return (this.resultado()?.proveedores ?? []).filter(
+      (p) => !prov || normalizar(p.nombre || p.proveedor_id).includes(prov),
+    );
+  });
+
+  // -- ficha del SKU buscado ----------------------------------------------
+
+  /** Los renglones del SKU buscado, ignorando los demás filtros: si alguien
+   *  busca un SKU y además tiene puesto un filtro de causa, la ficha debe
+   *  hablar del SKU completo y no del recorte. */
+  private readonly renglonesDelSku = computed<FilaSkuTienda[]>(() => {
+    const sku = normalizar(this.filtroSku());
+    if (!sku) return [];
+    return (this.resultado()?.por_sku_tienda ?? []).filter((s) => normalizar(s.sku).includes(sku));
+  });
+
+  readonly fichaSku = computed(() => {
+    const filas = this.renglonesDelSku();
+    if (!filas.length) return null;
+    const skus = new Set(filas.map((f) => f.sku));
+    return {
+      sku: skus.size === 1 ? [...skus][0] : `${skus.size} SKU`,
+      tiendas: new Set(filas.map((f) => f.tienda)).size,
+      diasConFaltante: filas.reduce((a, f) => a + f.dias_con_faltante, 0),
+      diasClasificados: filas.reduce((a, f) => a + f.dias_clasificados, 0),
+      ventaPerdida: filas.reduce((a, f) => a + f.venta_perdida, 0),
+      causas: [...new Set(filas.map((f) => `${f.root_cause_id} · ${f.causa}`))],
+      citas: this.citasFiltradas().length,
+    };
+  });
+
+  /** Se buscó un SKU y no salió en el análisis. No es un error de búsqueda y
+   *  hay que decir por qué, porque son dos razones muy distintas y ninguna
+   *  significa "no existe". */
+  readonly skuSinFaltantes = computed(
+    () => !!this.filtroSku().trim() && this.renglonesDelSku().length === 0,
+  );
+
+  // -- paginadores ---------------------------------------------------------
+  //
+  // Se declaran después de las listas: los campos de clase se inicializan en
+  // orden y cada paginador necesita su señal ya construida.
+
+  readonly pgSkus = new Paginador(this.skusFiltrados);
+  readonly pgProveedores = new Paginador(this.proveedoresFiltrados);
+  readonly pgCitas = new Paginador(this.citasFiltradas);
+  readonly pgCausas = new Paginador(computed(() => this.resultado()?.por_causa ?? []));
+  readonly pgResponsables = new Paginador(computed(() => this.resultado()?.por_responsable ?? []));
+  readonly pgSubcausas = new Paginador(computed(() => this.resultado()?.por_subcausa ?? []));
+  readonly pgBloqueos = new Paginador(computed(() => this.resultado()?.cobertura?.bloqueos ?? []));
+
+  private reiniciarPaginas(): void {
+    for (const p of [this.pgSkus, this.pgProveedores, this.pgCitas]) p.reiniciar();
+  }
+
+  // -- handlers ------------------------------------------------------------
+
+  ponSku(e: Event): void {
+    this.filtroSku.set((e.target as HTMLInputElement).value);
+    this.reiniciarPaginas();
+  }
+
+  ponProveedor(e: Event): void {
+    this.filtroProveedor.set((e.target as HTMLInputElement).value);
+    this.reiniciarPaginas();
+  }
+
+  ponTienda(e: Event): void {
+    this.filtroTienda.set((e.target as HTMLSelectElement).value);
+    this.reiniciarPaginas();
+  }
+
+  ponCausa(e: Event): void {
+    this.filtroCausa.set((e.target as HTMLSelectElement).value);
+    this.reiniciarPaginas();
+  }
+
+  ponResponsable(e: Event): void {
+    this.filtroResponsable.set((e.target as HTMLSelectElement).value);
+    this.reiniciarPaginas();
+  }
+
+  limpiarFiltros(): void {
+    this.filtroSku.set('');
+    this.filtroTienda.set('');
+    this.filtroCausa.set('');
+    this.filtroResponsable.set('');
+    this.filtroProveedor.set('');
+    this.reiniciarPaginas();
+  }
+
+  /** Desde el top de portada: clic en un SKU y la pantalla se filtra a él. */
+  verSku(sku: string): void {
+    this.filtroSku.set(sku);
+    this.reiniciarPaginas();
+    this.verDetalle.set(true);
+    document.getElementById('filtros')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // -- ayudas de presentación ---------------------------------------------

@@ -222,6 +222,108 @@
         </p>
       }
 
+      <!-- ====================== FILTROS ====================== -->
+      <section class="tarjeta filtros" id="filtros">
+        <div class="filtros-fila">
+          <label class="campo ancho">
+            <span>SKU</span>
+            <input
+              type="search"
+              placeholder="Pega o escribe un SKU — p. ej. 663985002478"
+              [value]="filtroSku()"
+              (input)="ponSku($event)"
+            />
+          </label>
+
+          <label class="campo">
+            <span>Tienda</span>
+            <select (change)="ponTienda($event)">
+              <option value="" [selected]="!filtroTienda()">Todas</option>
+              @for (t of tiendas(); track t) {
+                <option [value]="t" [selected]="t === filtroTienda()">{{ t }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="campo">
+            <span>Causa raíz</span>
+            <select (change)="ponCausa($event)">
+              <option value="" [selected]="!filtroCausa()">Todas</option>
+              @for (c of causas(); track c.id) {
+                <option [value]="c.id" [selected]="c.id === filtroCausa()">
+                  {{ c.id }} · {{ c.causa }}
+                </option>
+              }
+            </select>
+          </label>
+
+          <label class="campo">
+            <span>Responsable</span>
+            <select (change)="ponResponsable($event)">
+              <option value="" [selected]="!filtroResponsable()">Todos</option>
+              @for (x of responsables(); track x) {
+                <option [value]="x" [selected]="x === filtroResponsable()">{{ x }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="campo">
+            <span>Proveedor</span>
+            <input
+              type="search"
+              placeholder="Nombre del proveedor"
+              [value]="filtroProveedor()"
+              (input)="ponProveedor($event)"
+            />
+          </label>
+
+          @if (hayFiltro()) {
+            <button class="btn-plano limpiar" (click)="limpiarFiltros()">Limpiar</button>
+          }
+        </div>
+
+        <!-- ficha del SKU buscado -->
+        @if (fichaSku(); as f) {
+          <div class="ficha">
+            <div class="ficha-cab">
+              <code>{{ f.sku }}</code>
+              <span>en {{ f.tiendas }} tienda{{ f.tiendas > 1 ? 's' : '' }}</span>
+            </div>
+            <div class="ficha-datos">
+              <span><b>{{ f.diasConFaltante | number }}</b> días con faltante</span>
+              <span><b>{{ f.diasClasificados | number }}</b> explicados</span>
+              <span><b>{{ f.ventaPerdida | number: '1.0-0' }}</b> de venta perdida</span>
+              @if (f.citas) {
+                <span><b>{{ f.citas }}</b> citas falladas</span>
+              }
+            </div>
+            <div class="ficha-causas">
+              @for (c of f.causas; track c) {
+                <span class="chip claro">{{ c }}</span>
+              }
+            </div>
+          </div>
+        }
+
+        @if (skuSinFaltantes()) {
+          <div class="ficha vacia">
+            <b>Ese SKU no aparece en el análisis.</b>
+            <p>
+              Sólo puede ser por dos razones, y ninguna es que no exista: o
+              <b>no tuvo un solo día con faltante</b> en el periodo —está sano y BOPS nunca lo
+              reportó, que es de donde arranca todo el análisis—, o su SKU
+              <b>no está en el catálogo de la tienda</b> y quedó fuera del alcance junto con los
+              otros {{ r.cobertura!.casos_fuera_de_alcance | number }} días.
+            </p>
+            <p class="pista">
+              Para distinguir cuál de las dos es, y ver su inventario y venta día por día, hay que
+              correr <code>orcmm_expediente.py</code> en el backend: ese detalle no viaja en esta
+              respuesta.
+            </p>
+          </div>
+        }
+      </section>
+
       <!-- waterfall: de 100% al OSA real, en puntos -->
       @if (r.waterfall?.escalones?.length) {
         <section class="tarjeta">
@@ -269,7 +371,7 @@
           <h2>SKU que más costaron</h2>
           <div class="agua">
             @for (s of topSkus(); track s.sku + s.tienda) {
-              <div class="agua-fila">
+              <div class="agua-fila clicable" (click)="verSku(s.sku)" title="Filtrar por este SKU">
                 <span class="agua-eti">
                   {{ s.sku }}
                   <small>tienda {{ s.tienda }} · {{ s.dias_con_faltante }} días</small>
@@ -318,7 +420,7 @@
               </tr>
             </thead>
             <tbody>
-              @for (c of r.por_causa; track c.root_cause_id) {
+              @for (c of pgCausas.items(); track c.root_cause_id) {
                 <tr>
                   <td>
                     <span class="chip" [style.background]="color(c.root_cause_id)">{{
@@ -337,6 +439,7 @@
               }
             </tbody>
           </table>
+          <app-paginador [p]="pgCausas" />
         </section>
 
         <section class="tarjeta">
@@ -351,7 +454,7 @@
               </tr>
             </thead>
             <tbody>
-              @for (x of r.por_responsable; track x.responsable) {
+              @for (x of pgResponsables.items(); track x.responsable) {
                 <tr>
                   <td>{{ x.responsable }}</td>
                   <td class="num">{{ x.dias }}</td>
@@ -364,6 +467,7 @@
               }
             </tbody>
           </table>
+          <app-paginador [p]="pgResponsables" />
         </section>
       </div>
 
@@ -392,7 +496,7 @@
               </tr>
             </thead>
             <tbody>
-              @for (p of r.proveedores; track p.proveedor_id) {
+              @for (p of pgProveedores.items(); track p.proveedor_id) {
                 <tr>
                   <td>{{ p.nombre || p.proveedor_id }}</td>
                   <td class="num">{{ p.pedidos }}</td>
@@ -412,8 +516,14 @@
                   <td class="num">{{ p.citas_incumplidas }}</td>
                 </tr>
               }
+              @if (!pgProveedores.total()) {
+                <tr>
+                  <td colspan="10" class="vacio">Ningún proveedor coincide con el filtro.</td>
+                </tr>
+              }
             </tbody>
           </table>
+          <app-paginador [p]="pgProveedores" />
 
           @if (r.por_subcausa?.length) {
             <h3>Qué detalle de la causa costó más</h3>
@@ -426,7 +536,7 @@
                 </tr>
               </thead>
               <tbody>
-                @for (s of r.por_subcausa; track s.subcausa) {
+                @for (s of pgSubcausas.items(); track s.subcausa) {
                   <tr>
                     <td>{{ s.subcausa }}</td>
                     <td class="num">{{ s.dias }}</td>
@@ -435,6 +545,7 @@
                 }
               </tbody>
             </table>
+            <app-paginador [p]="pgSubcausas" />
           }
         </section>
       }
@@ -457,7 +568,7 @@
               </tr>
             </thead>
             <tbody>
-              @for (b of r.cobertura!.bloqueos; track b.campo) {
+              @for (b of pgBloqueos.items(); track b.campo) {
                 <tr>
                   <td><code>{{ b.campo }}</code></td>
                   <td class="num">{{ b.dias }}</td>
@@ -467,6 +578,7 @@
               }
             </tbody>
           </table>
+          <app-paginador [p]="pgBloqueos" />
         </section>
       }
 
@@ -477,7 +589,15 @@
         </button>
 
         @if (verDetalle()) {
-          <h3>Por SKU y tienda, ordenado por impacto</h3>
+          <h3>
+            Por SKU y tienda, ordenado por impacto
+            @if (hayFiltro()) {
+              <small class="filtrado">
+                {{ pgSkus.total() | number }} de
+                {{ r.por_sku_tienda!.length | number }} con el filtro puesto
+              </small>
+            }
+          </h3>
           <table>
             <thead>
               <tr>
@@ -492,9 +612,13 @@
               </tr>
             </thead>
             <tbody>
-              @for (s of r.por_sku_tienda; track s.sku + s.tienda) {
+              @for (s of pgSkus.items(); track s.sku + s.tienda) {
                 <tr>
-                  <td><code>{{ s.sku }}</code></td>
+                  <td>
+                    <code class="clicable" (click)="verSku(s.sku)" title="Filtrar por este SKU">{{
+                      s.sku
+                    }}</code>
+                  </td>
                   <td>{{ s.tienda }}</td>
                   <td class="num">{{ s.dias_clasificados }}/{{ s.dias_con_faltante }}</td>
                   <td class="num" [class.medio]="s.cobertura_pct < 100">{{ s.cobertura_pct }}%</td>
@@ -509,11 +633,25 @@
                   <td>{{ s.responsable }}</td>
                 </tr>
               }
+              @if (!pgSkus.total()) {
+                <tr>
+                  <td colspan="8" class="vacio">Ningún SKU coincide con el filtro.</td>
+                </tr>
+              }
             </tbody>
           </table>
+          <app-paginador [p]="pgSkus" />
 
           @if (r.citas_falladas?.length) {
-            <h3>Citas en las que el proveedor entregó de menos</h3>
+            <h3>
+              Citas en las que el proveedor entregó de menos
+              @if (hayFiltro()) {
+                <small class="filtrado">
+                  {{ pgCitas.total() | number }} de
+                  {{ r.citas_falladas!.length | number }} con el filtro puesto
+                </small>
+              }
+            </h3>
             <table>
               <thead>
                 <tr>
@@ -527,7 +665,7 @@
                 </tr>
               </thead>
               <tbody>
-                @for (c of r.citas_falladas; track c.folio_cita) {
+                @for (c of pgCitas.items(); track c.folio_cita) {
                   <tr>
                     <td>{{ c.proveedor }}</td>
                     <td><code>{{ c.folio }}</code></td>
@@ -538,8 +676,14 @@
                     <td class="num mal">{{ c.faltantes }}</td>
                   </tr>
                 }
+                @if (!pgCitas.total()) {
+                  <tr>
+                    <td colspan="7" class="vacio">Ninguna cita coincide con el filtro.</td>
+                  </tr>
+                }
               </tbody>
             </table>
+            <app-paginador [p]="pgCitas" />
           }
 
           <h3>Fuentes leídas</h3>
