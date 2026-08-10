@@ -1,6 +1,6 @@
 import { DecimalPipe, PercentPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import { Analisis, CitaFallada, FilaProveedor, FilaSkuTienda, Orcmm } from './orcmm';
+import { Analisis, CitaFallada, FilaProveedor, FilaSkuTienda, Orcmm, Tienda } from './orcmm';
 import { Paginador, PaginadorCtrl } from './paginacion';
 
 /** Comparación laxa para los filtros de texto: sin acentos, sin mayúsculas y
@@ -17,6 +17,10 @@ function normalizar(s: string): string {
 }
 
 type Paso = 'inicio' | 'trabajando' | 'bloqueado' | 'listo' | 'sin-datos' | 'error';
+
+/** 'archivo': subir Excel+CSV, como siempre. 'tienda': elegir tienda y
+ *  periodo y analizar directo contra lo ya cargado en Postgres. */
+type Modo = 'archivo' | 'tienda';
 
 /**
  * INTERRUPTOR TEMPORAL — avisos de SIMA en pantalla.
@@ -68,6 +72,27 @@ export class App {
   readonly verDetalle = signal(false);
   /** Cuánto lleva corriendo el análisis, según el backend. */
   readonly segundos = signal(0);
+
+  // -- analizar desde la base de datos (tienda + periodo) ------------------
+
+  readonly modo = signal<Modo>('archivo');
+  readonly tiendasDisponibles = signal<Tienda[]>([]);
+  readonly cargandoTiendas = signal(false);
+  /** Obligatoria y de selección única: el análisis siempre corre sobre
+   *  exactamente esta tienda, nunca "todas" ni varias a la vez. */
+  readonly tiendaSeleccionada = signal('');
+  readonly fechaDesde = signal('');
+  readonly fechaHasta = signal('');
+
+  readonly tiendaActiva = computed(
+    () => this.tiendasDisponibles().find((t) => t.tienda === this.tiendaSeleccionada()) ?? null,
+  );
+
+  readonly etiquetaTrabajo = computed(() =>
+    this.modo() === 'archivo'
+      ? this.nombrePaquete()
+      : `Tienda ${this.tiendaSeleccionada()} · ${this.fechaDesde()} a ${this.fechaHasta()}`,
+  );
 
   readonly nombrePaquete = computed(() => {
     const a = this.archivos();
@@ -219,8 +244,80 @@ export class App {
     this.error.set(null);
     this.verDetalle.set(false);
     this.segundos.set(0);
+    this.tiendaSeleccionada.set('');
+    this.fechaDesde.set('');
+    this.fechaHasta.set('');
     this.limpiarFiltros();
     this.paso.set('inicio');
+    // 'modo' no se reinicia a propósito: si el usuario ya estaba en "elegir
+    // tienda y periodo", tiene más sentido que se quede ahí que forzarlo de
+    // vuelta a "subir archivo".
+  }
+
+  // -- analizar desde la base de datos (tienda + periodo) -------------------
+
+  elegirModo(m: Modo): void {
+    this.modo.set(m);
+    this.error.set(null);
+    if (m === 'tienda' && !this.tiendasDisponibles().length) {
+      this.cargandoTiendas.set(true);
+      this.api.listarTiendas().subscribe({
+        next: (ts) => {
+          this.tiendasDisponibles.set(ts);
+          this.cargandoTiendas.set(false);
+        },
+        error: () => {
+          this.error.set('No se pudo cargar la lista de tiendas.');
+          this.cargandoTiendas.set(false);
+        },
+      });
+    }
+  }
+
+  ponTiendaSeleccionada(evento: Event): void {
+    const tienda = (evento.target as HTMLSelectElement).value;
+    this.tiendaSeleccionada.set(tienda);
+    // Precarga el rango disponible de esa tienda — sigue siendo editable,
+    // pero de entrada ya queda un periodo válido con dos clics menos.
+    const t = this.tiendasDisponibles().find((x) => x.tienda === tienda);
+    this.fechaDesde.set(t?.fecha_min ?? '');
+    this.fechaHasta.set(t?.fecha_max ?? '');
+  }
+
+  ponFechaDesde(evento: Event): void {
+    this.fechaDesde.set((evento.target as HTMLInputElement).value);
+  }
+
+  ponFechaHasta(evento: Event): void {
+    this.fechaHasta.set((evento.target as HTMLInputElement).value);
+  }
+
+  analizarTienda(): void {
+    const tienda = this.tiendaSeleccionada();
+    const desde = this.fechaDesde();
+    const hasta = this.fechaHasta();
+    if (!tienda || !desde || !hasta) return;
+
+    this.paso.set('trabajando');
+    this.error.set(null);
+    this.segundos.set(0);
+
+    this.api.analizarPorTienda(tienda, desde, hasta).subscribe({
+      next: (r) => {
+        if (r.estado === 'en_proceso') {
+          this.segundos.set(r.segundos ?? 0);
+          return;
+        }
+        this.resultado.set(r);
+        this.paso.set(
+          r.estado === 'ok' ? 'listo' : r.estado === 'sin_datos' ? 'sin-datos' : 'bloqueado',
+        );
+      },
+      error: (e) => {
+        this.error.set(e?.error?.detail ?? 'No se pudo analizar desde la base de datos.');
+        this.paso.set('error');
+      },
+    });
   }
 
   // -- portada ejecutiva ---------------------------------------------------

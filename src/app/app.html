@@ -14,36 +14,112 @@
 <main>
   <!-- ============================ CARGA ============================ -->
   @if (paso() === 'inicio' || paso() === 'error') {
-    <section class="tarjeta">
-      <label
-        class="zona"
-        [class.activa]="arrastrando()"
-        (dragover)="sobrevolar($event, true)"
-        (dragleave)="sobrevolar($event, false)"
-        (drop)="soltar($event)"
+    <div class="filtros-fila">
+      <button
+        [class]="modo() === 'archivo' ? 'btn' : 'btn-plano'"
+        (click)="elegirModo('archivo')"
       >
-        <input
-          type="file"
-          accept=".xlsx,.csv,.zip"
-          multiple
-          (change)="elegir($event)"
-          hidden
-        />
-        <strong>Arrastra aquí la captura completa</strong>
-        <span>
-          el <b>.xlsx</b> del layout junto con los <b>.csv</b> de Tableau, o un
-          <b>.zip</b> con todo dentro
-        </span>
-        <span class="pista">
-          El zip es lo más rápido: esos CSV pesan cientos de MB sueltos y menos de
-          cuarenta comprimidos.
-        </span>
-      </label>
+        Subir archivo
+      </button>
+      <button
+        [class]="modo() === 'tienda' ? 'btn' : 'btn-plano'"
+        (click)="elegirModo('tienda')"
+      >
+        Elegir tienda y periodo
+      </button>
+    </div>
 
-      @if (error(); as e) {
-        <p class="aviso mal">{{ e }}</p>
-      }
-    </section>
+    @if (modo() === 'archivo') {
+      <section class="tarjeta">
+        <label
+          class="zona"
+          [class.activa]="arrastrando()"
+          (dragover)="sobrevolar($event, true)"
+          (dragleave)="sobrevolar($event, false)"
+          (drop)="soltar($event)"
+        >
+          <input
+            type="file"
+            accept=".xlsx,.csv,.zip"
+            multiple
+            (change)="elegir($event)"
+            hidden
+          />
+          <strong>Arrastra aquí la captura completa</strong>
+          <span>
+            el <b>.xlsx</b> del layout junto con los <b>.csv</b> de Tableau, o un
+            <b>.zip</b> con todo dentro
+          </span>
+          <span class="pista">
+            El zip es lo más rápido: esos CSV pesan cientos de MB sueltos y menos de
+            cuarenta comprimidos.
+          </span>
+        </label>
+      </section>
+    } @else {
+      <section class="tarjeta">
+        <h2>Analizar desde la base de datos</h2>
+        <p class="nota">
+          Mismo motor de clasificación, sobre lo que ya está cargado en Postgres para
+          la tienda y el periodo elegidos. La tienda es obligatoria: el análisis corre
+          siempre sobre una sola.
+        </p>
+
+        <div class="filtros-fila">
+          <label class="campo">
+            <span>Tienda</span>
+            <select (change)="ponTiendaSeleccionada($event)" [disabled]="cargandoTiendas()">
+              <option value="" [selected]="!tiendaSeleccionada()">
+                {{ cargandoTiendas() ? 'Cargando…' : 'Elegir…' }}
+              </option>
+              @for (t of tiendasDisponibles(); track t.tienda) {
+                <option [value]="t.tienda" [selected]="t.tienda === tiendaSeleccionada()">
+                  {{ t.tienda }}{{ t.nombre ? ' · ' + t.nombre : '' }}
+                </option>
+              }
+            </select>
+          </label>
+
+          <label class="campo">
+            <span>Desde</span>
+            <input
+              type="date"
+              [value]="fechaDesde()"
+              [attr.min]="tiendaActiva()?.fecha_min"
+              [attr.max]="tiendaActiva()?.fecha_max"
+              (change)="ponFechaDesde($event)"
+            />
+          </label>
+
+          <label class="campo">
+            <span>Hasta</span>
+            <input
+              type="date"
+              [value]="fechaHasta()"
+              [attr.min]="tiendaActiva()?.fecha_min"
+              [attr.max]="tiendaActiva()?.fecha_max"
+              (change)="ponFechaHasta($event)"
+            />
+          </label>
+
+          <button
+            class="btn"
+            [disabled]="!tiendaSeleccionada() || !fechaDesde() || !fechaHasta()"
+            (click)="analizarTienda()"
+          >
+            Analizar
+          </button>
+        </div>
+
+        @if (tiendaActiva(); as t) {
+          <p class="nota">Datos cargados del {{ t.fecha_min }} al {{ t.fecha_max }}.</p>
+        }
+      </section>
+    }
+
+    @if (error(); as e) {
+      <p class="aviso mal">{{ e }}</p>
+    }
   }
 
   <!-- ========================== TRABAJANDO ========================== -->
@@ -52,7 +128,7 @@
       <div class="girando"></div>
       <p>Validando la captura y clasificando los días con faltante…</p>
       <p class="nota">
-        {{ nombrePaquete() }}
+        {{ etiquetaTrabajo() }}
         @if (segundos()) {
           · {{ segundos() | number: '1.0-0' }} s
         }

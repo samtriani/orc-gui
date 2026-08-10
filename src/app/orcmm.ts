@@ -217,6 +217,16 @@ interface Encolado {
   estado: 'en_proceso';
 }
 
+/** Una fila de GET /api/tiendas — tiendas con datos ya cargados en Postgres. */
+export interface Tienda {
+  tienda: string;
+  nombre: string | null;
+  formato: string | null;
+  /** Rango de fechas con datos, para acotar el selector de periodo. */
+  fecha_min: string | null;
+  fecha_max: string | null;
+}
+
 /** Cada cuánto se le pregunta al backend si ya terminó. El análisis del layout
  *  completo tarda un par de minutos, así que preguntar más seguido sólo suma
  *  peticiones sin adelantar nada. */
@@ -264,5 +274,31 @@ export class Orcmm {
 
   urlDescarga(id: string): string {
     return `${this.base}/resultado/${id}`;
+  }
+
+  /** Tiendas con datos ya cargados en Postgres, para el selector de "elegir
+   *  tienda y periodo" (alternativa a subir un archivo). */
+  listarTiendas(): Observable<Tienda[]> {
+    return this.http.get<{ tiendas: Tienda[] }>(`${this.base}/tiendas`).pipe(map((r) => r.tiendas));
+  }
+
+  /**
+   * Igual que `analizar()`, pero en vez de subir un archivo, pide el
+   * análisis para una tienda y un periodo que ya viven en Postgres. Mismo
+   * acuse-y-poll: el backend encola en la misma cola de siempre y aquí se
+   * sigue exactamente igual que un análisis por archivo.
+   */
+  analizarPorTienda(tienda: string, desde: string, hasta: string, umbralOsa = 100): Observable<Analisis> {
+    const cuerpo = { tienda, desde, hasta, umbral_osa: umbralOsa };
+
+    return this.http.post<Encolado>(`${this.base}/analizar-tienda`, cuerpo).pipe(
+      switchMap((encolado) =>
+        timer(0, ESPERA_MS).pipe(
+          switchMap(() => this.http.get<Analisis>(`${this.base}/analizar/${encolado.id}`)),
+          map((estado) => ({ ...estado, id: encolado.id })),
+          takeWhile((estado) => estado.estado === 'en_proceso', true),
+        ),
+      ),
+    );
   }
 }
