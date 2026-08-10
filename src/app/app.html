@@ -685,6 +685,9 @@
                 <th class="num">OSA prom.</th>
                 <th>Causa dominante</th>
                 <th>Responsable</th>
+                @if (modo() === 'tienda') {
+                  <th></th>
+                }
               </tr>
             </thead>
             <tbody>
@@ -707,11 +710,20 @@
                     {{ s.causa }}
                   </td>
                   <td>{{ s.responsable }}</td>
+                  @if (modo() === 'tienda') {
+                    <td>
+                      <button class="btn-plano" (click)="verExpediente(s.sku, s.tienda)">
+                        Evolución diaria
+                      </button>
+                    </td>
+                  }
                 </tr>
               }
               @if (!pgSkus.total()) {
                 <tr>
-                  <td colspan="8" class="vacio">Ningún SKU coincide con el filtro.</td>
+                  <td [attr.colspan]="modo() === 'tienda' ? 9 : 8" class="vacio">
+                    Ningún SKU coincide con el filtro.
+                  </td>
                 </tr>
               }
             </tbody>
@@ -798,6 +810,69 @@
           }
         }
       </section>
+
+      <!-- ==================== EVOLUCIÓN DIARIA DE UN SKU ==================== -->
+      @if (cargandoExpediente() || errorExpediente() || expedienteAbierto()) {
+        <section class="tarjeta" id="expediente">
+          @if (cargandoExpediente()) {
+            <p class="nota">Cargando evolución diaria…</p>
+          }
+          @if (errorExpediente(); as err) {
+            <p class="aviso mal">{{ err }}</p>
+          }
+          @if (expedienteAbierto(); as ex) {
+            <div class="filtros-fila">
+              <h2>
+                Evolución diaria · <code>{{ ex.sku }}</code>
+                @if (ex.descripcion) {
+                  — {{ ex.descripcion }}
+                }
+              </h2>
+              <button class="btn-plano" (click)="cerrarExpediente()">Cerrar</button>
+            </div>
+            <p class="nota">
+              Tienda {{ ex.tienda }} · {{ ex.desde }} a {{ ex.hasta }} — mismo motor que clasifica
+              el análisis completo, día por día.
+            </p>
+
+            <div class="expediente">
+              @for (d of ex.dias; track d.fecha) {
+                <div class="expediente-dia">
+                  <div class="expediente-barras">
+                    <span class="expediente-barra tienda" [title]="'Existencia en tienda: ' + (d.existencia_tienda ?? 'sin dato')">
+                      <i [style.height]="altoBarraDia(d.existencia_tienda, 'existencia_tienda')"></i>
+                    </span>
+                    <span class="expediente-barra venta" [title]="'Unidades vendidas: ' + (d.unidades_vendidas ?? 'sin dato')">
+                      <i [style.height]="altoBarraDia(d.unidades_vendidas, 'unidades_vendidas')"></i>
+                    </span>
+                    <span class="expediente-barra cedis" [title]="'Existencia en CEDIS: ' + (d.existencia_cedis ?? 'sin dato')">
+                      <i [style.height]="altoBarraDia(d.existencia_cedis, 'existencia_cedis')"></i>
+                    </span>
+                  </div>
+                  <div class="expediente-marcas" [title]="'Pedido tienda: ' + (d.pedido_tienda_abierto ? 'abierto' : 'no') + ' · Tránsito: ' + (d.transito_vigente ? 'sí' : 'no') + ' · Orden a proveedor: ' + (d.orden_proveedor_vigente ? 'vigente' : 'no')">
+                    <span [class.activa]="d.pedido_tienda_abierto">PT</span>
+                    <span [class.activa]="d.transito_vigente || d.envio_generado">CD</span>
+                    <span [class.activa]="d.orden_proveedor_vigente">PV</span>
+                  </div>
+                  <span class="expediente-dia-num">{{ d.fecha | slice: 8 : 10 }}</span>
+                  <span
+                    class="expediente-causa"
+                    [style.background]="d.root_cause_id ? color(d.root_cause_id) : 'var(--linea)'"
+                    [title]="d.root_cause_id ? d.root_cause_id + ' · ' + d.causa_raiz : 'Sin faltante'"
+                  ></span>
+                </div>
+              }
+            </div>
+            <p class="nota">
+              <span class="expediente-leyenda tienda"></span> Existencia tienda ·
+              <span class="expediente-leyenda venta"></span> Venta ·
+              <span class="expediente-leyenda cedis"></span> Existencia CEDIS · PT: pedido tienda
+              abierto · CD: envío/tránsito CEDIS vigente · PV: orden a proveedor vigente. El cuadro
+              de abajo es la causa raíz del día (gris = sin faltante).
+            </p>
+          }
+        </section>
+      }
     }
   }
 </main>

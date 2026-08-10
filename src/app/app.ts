@@ -1,6 +1,6 @@
-import { DecimalPipe, PercentPipe } from '@angular/common';
+import { DecimalPipe, PercentPipe, SlicePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import { Analisis, CitaFallada, FilaProveedor, FilaSkuTienda, Orcmm, Tienda } from './orcmm';
+import { Analisis, CitaFallada, Expediente, FilaProveedor, FilaSkuTienda, Orcmm, Tienda } from './orcmm';
 import { Paginador, PaginadorCtrl } from './paginacion';
 
 /** Comparación laxa para los filtros de texto: sin acentos, sin mayúsculas y
@@ -57,7 +57,7 @@ const COLOR_CAUSA: Record<string, string> = {
 
 @Component({
   selector: 'app-root',
-  imports: [DecimalPipe, PercentPipe, PaginadorCtrl],
+  imports: [DecimalPipe, PercentPipe, SlicePipe, PaginadorCtrl],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
@@ -526,6 +526,57 @@ export class App {
     this.reiniciarPaginas();
     this.verDetalle.set(true);
     document.getElementById('filtros')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // -- detalle diario por SKU (evolución diaria) ----------------------------
+  //
+  // Sólo disponible cuando el análisis vino del modo "tienda" (datos ya en
+  // Postgres): ahí sí hay tienda + periodo garantizados. Un análisis por
+  // archivo puede traer un SKU que ni siquiera esté cargado en la base.
+
+  readonly expedienteAbierto = signal<Expediente | null>(null);
+  readonly cargandoExpediente = signal(false);
+  readonly errorExpediente = signal<string | null>(null);
+
+  verExpediente(sku: string, tienda: string): void {
+    const desde = this.fechaDesde();
+    const hasta = this.fechaHasta();
+    if (!desde || !hasta) return;
+
+    this.cargandoExpediente.set(true);
+    this.errorExpediente.set(null);
+    this.expedienteAbierto.set(null);
+
+    this.api.expediente(tienda, sku, desde, hasta).subscribe({
+      next: (e) => {
+        this.expedienteAbierto.set(e);
+        this.cargandoExpediente.set(false);
+        document.getElementById('expediente')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      },
+      error: (e) => {
+        this.errorExpediente.set(e?.error?.detail ?? 'No se pudo cargar el detalle diario.');
+        this.cargandoExpediente.set(false);
+      },
+    });
+  }
+
+  cerrarExpediente(): void {
+    this.expedienteAbierto.set(null);
+    this.errorExpediente.set(null);
+  }
+
+  /** Máximo de cada métrica dentro del periodo mostrado — igual que
+   *  `escalonMayor` del waterfall: cada barra escala contra el máximo de su
+   *  propia lista, no contra un total absoluto, para que un valor chico no
+   *  desaparezca. */
+  private maximoDia(campo: 'existencia_tienda' | 'unidades_vendidas' | 'existencia_cedis'): number {
+    const dias = this.expedienteAbierto()?.dias ?? [];
+    return Math.max(...dias.map((d) => d[campo] ?? 0), 0.01);
+  }
+
+  altoBarraDia(valor: number | null, campo: 'existencia_tienda' | 'unidades_vendidas' | 'existencia_cedis'): string {
+    if (valor === null) return '0%';
+    return `${Math.max((valor / this.maximoDia(campo)) * 100, 2)}%`;
   }
 
   // -- ayudas de presentación ---------------------------------------------

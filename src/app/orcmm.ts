@@ -227,6 +227,37 @@ export interface Tienda {
   fecha_max: string | null;
 }
 
+/** Un día del detalle diario de un SKU (GET /api/expediente). Los booleanos
+ *  y `root_cause_id` vienen del mismo motor que clasifica el análisis
+ *  completo — no es una aproximación aparte. `root_cause_id` es `null` en
+ *  los días sin faltante (OSA 100%). */
+export interface DiaExpediente {
+  fecha: string;
+  osa_pct: number | null;
+  existencia_tienda: number | null;
+  unidades_vendidas: number | null;
+  existencia_cedis: number | null;
+  pedido_tienda_abierto: boolean | null;
+  transito_vigente: boolean | null;
+  envio_generado: boolean | null;
+  orden_proveedor_vigente: boolean | null;
+  cajas_pedidas_proveedor: number | null;
+  cajas_entregadas_proveedor: number | null;
+  root_cause_id: string | null;
+  causa_raiz: string | null;
+  responsable: string | null;
+}
+
+/** Respuesta de GET /api/expediente. */
+export interface Expediente {
+  sku: string;
+  tienda: string;
+  descripcion: string | null;
+  desde: string;
+  hasta: string;
+  dias: DiaExpediente[];
+}
+
 /** Cada cuánto se le pregunta al backend si ya terminó. El análisis del layout
  *  completo tarda un par de minutos, así que preguntar más seguido sólo suma
  *  peticiones sin adelantar nada. */
@@ -300,5 +331,13 @@ export class Orcmm {
         ),
       ),
     );
+  }
+
+  /** Detalle diario de un SKU en una tienda: inventario, venta, pedidos y la
+   *  causa raíz de cada día. A diferencia de analizar()/analizarPorTienda(),
+   *  no hace falta acuse-y-poll — un solo SKU responde directo. */
+  expediente(tienda: string, sku: string, desde: string, hasta: string): Observable<Expediente> {
+    const params = { tienda, sku, desde, hasta };
+    return this.http.get<Expediente>(`${this.base}/expediente`, { params });
   }
 }
