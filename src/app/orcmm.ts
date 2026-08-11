@@ -7,8 +7,8 @@
  */
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, timer } from 'rxjs';
-import { map, switchMap, takeWhile } from 'rxjs/operators';
+import { Observable, of, timer } from 'rxjs';
+import { concatMap, exhaustMap, map, switchMap, takeWhile } from 'rxjs/operators';
 
 export interface Validacion {
   /** Layout roto: el modelo leería mal. Bloquean. */
@@ -290,17 +290,40 @@ export class Orcmm {
 
     return this.http
       .post<Encolado>(`${this.base}/analizar`, cuerpo, { params: { corregir, forzar } })
-      .pipe(
-        switchMap((encolado) =>
-          timer(0, ESPERA_MS).pipe(
-            switchMap(() => this.http.get<Analisis>(`${this.base}/analizar/${encolado.id}`)),
-            // El id no viene en la respuesta mientras corre; se conserva el
-            // del acuse para que la descarga lo tenga siempre.
-            map((estado) => ({ ...estado, id: encolado.id })),
-            takeWhile((estado) => estado.estado === 'en_proceso', true),
-          ),
-        ),
-      );
+      .pipe(switchMap((encolado) => this.seguir(encolado.id)));
+  }
+
+  /**
+   * Sigue un análisis encolado hasta que termina: emite el avance mientras
+   * corre y el resumen completo al final.
+   *
+   * Dos decisiones que importan, las dos aprendidas a golpes:
+   *
+   * `exhaustMap` y NO `switchMap` — mientras haya una petición viva, los ticks
+   * nuevos se ignoran en vez de abortarla. Con `switchMap`, cualquier
+   * respuesta más lenta que el intervalo se cancelaba en cada vuelta y la
+   * pantalla se quedaba girando para siempre con el análisis ya terminado del
+   * otro lado.
+   *
+   * El resumen se pide APARTE y una sola vez. `/analizar/{id}` devuelve unos
+   * bytes de estado; el resumen del análisis real pesa ~1.5 MB y tarda 3.7 s
+   * directo y 17-30 s por el proxy de Vercel. Arrastrarlo en cada vuelta del
+   * poll era lo que hacía que ninguna respuesta cupiera en el intervalo.
+   */
+  private seguir(id: string): Observable<Analisis> {
+    return timer(0, ESPERA_MS).pipe(
+      exhaustMap(() => this.http.get<Analisis>(`${this.base}/analizar/${id}`)),
+      takeWhile((e) => e.estado === 'en_proceso', true),
+      concatMap((e) =>
+        e.estado === 'en_proceso'
+          ? of({ ...e, id })
+          : this.http
+              .get<Analisis>(`${this.base}/analizar/${id}/resumen`)
+              // El id no viene en el cuerpo; se conserva el del acuse para
+              // que la descarga lo tenga siempre.
+              .pipe(map((resumen) => ({ ...resumen, id }))),
+      ),
+    );
   }
 
   urlDescarga(id: string): string {
@@ -322,15 +345,9 @@ export class Orcmm {
   analizarPorTienda(tienda: string, desde: string, hasta: string, umbralOsa = 100): Observable<Analisis> {
     const cuerpo = { tienda, desde, hasta, umbral_osa: umbralOsa };
 
-    return this.http.post<Encolado>(`${this.base}/analizar-tienda`, cuerpo).pipe(
-      switchMap((encolado) =>
-        timer(0, ESPERA_MS).pipe(
-          switchMap(() => this.http.get<Analisis>(`${this.base}/analizar/${encolado.id}`)),
-          map((estado) => ({ ...estado, id: encolado.id })),
-          takeWhile((estado) => estado.estado === 'en_proceso', true),
-        ),
-      ),
-    );
+    return this.http
+      .post<Encolado>(`${this.base}/analizar-tienda`, cuerpo)
+      .pipe(switchMap((encolado) => this.seguir(encolado.id)));
   }
 
   /** Detalle diario de un SKU en una tienda: inventario, venta, pedidos y la
