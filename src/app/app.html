@@ -250,11 +250,6 @@
         <div class="cifra">
           <span class="etiqueta">OSA del periodo</span>
           <strong>{{ r.osa_alcance }}%</strong>
-          <!-- El boceto compara contra el mes anterior. No hay con qué: se
-               dice, en vez de dejar el hueco o inventar un 0.0. -->
-          <span class="delta nd" title="Se necesita al menos un periodo anterior cargado">
-            — sin periodo anterior con qué comparar
-          </span>
           <span class="pie">
             @if (hayFueraDeAlcance()) {
               Sobre los SKU del catálogo de la tienda

@@ -941,16 +941,3 @@ a.descarga::before { background: var(--acento) !important; }
   color: var(--s3);
 }
 
-/* -------- delta contra el periodo anterior, en la tarjeta de OSA -------- */
-/* Va con flecha + texto, nunca sólo color: un delta que se distingue por
-   verde/rojo es invisible para buena parte de la gente. */
-.delta {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-.delta.nd {
-  color: var(--tinta-suave);
-}
