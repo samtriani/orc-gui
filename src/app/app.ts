@@ -400,8 +400,13 @@ export class App {
   }
 
   /** Top de SKU por impacto para la portada. El listado completo vive en el
-   *  detalle; aquí sólo caben los que mueven la aguja. */
-  readonly topSkus = computed(() => (this.resultado()?.por_sku_tienda ?? []).slice(0, 6));
+   *  detalle; aquí sólo caben los que mueven la aguja. Sale de la lista YA
+   *  filtrada (`skusFiltrados`, más abajo) — a diferencia del waterfall y el
+   *  Pareto por causa/responsable, aquí sí se puede sin arriesgar el número:
+   *  cada renglón ya trae su propia venta_perdida, no hay nada que
+   *  recalcular mal. El orden (mayor venta perdida primero) lo pone el
+   *  backend y el filtro no lo revuelve. */
+  readonly topSkus = computed(() => this.skusFiltrados().slice(0, 6));
 
   private readonly ventaMayor = computed(() =>
     Math.max(...this.topSkus().map((s) => s.venta_perdida), 1),
