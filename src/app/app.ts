@@ -227,6 +227,7 @@ export class App {
         this.paso.set(
           r.estado === 'ok' ? 'listo' : r.estado === 'sin_datos' ? 'sin-datos' : 'bloqueado',
         );
+        if (r.estado === 'ok') this.asegurarNombresDeTienda();
       },
       error: (e) => {
         this.error.set(
@@ -274,6 +275,17 @@ export class App {
     }
   }
 
+  /** Los nombres de tienda para los combos del resultado. Se pide en
+   *  silencio: es un adorno de la pantalla, no algo por lo que valga la pena
+   *  enseñar un error — si falla, los combos se quedan con la clave. */
+  private asegurarNombresDeTienda(): void {
+    if (this.tiendasDisponibles().length) return;
+    this.api.listarTiendas().subscribe({
+      next: (ts) => this.tiendasDisponibles.set(ts),
+      error: () => {},
+    });
+  }
+
   ponTiendaSeleccionada(evento: Event): void {
     const tienda = (evento.target as HTMLSelectElement).value;
     this.tiendaSeleccionada.set(tienda);
@@ -312,6 +324,7 @@ export class App {
         this.paso.set(
           r.estado === 'ok' ? 'listo' : r.estado === 'sin_datos' ? 'sin-datos' : 'bloqueado',
         );
+        if (r.estado === 'ok') this.asegurarNombresDeTienda();
       },
       error: (e) => {
         this.error.set(e?.error?.detail ?? 'No se pudo analizar desde la base de datos.');
@@ -387,6 +400,22 @@ export class App {
   readonly tiendas = computed(() =>
     [...new Set((this.resultado()?.por_sku_tienda ?? []).map((s) => s.tienda))].sort(),
   );
+
+  /** id -> nombre. El resultado sólo trae la clave de tienda ("287"); el
+   *  nombre vive en /api/tiendas, así que se cruzan aquí. Si la lista no
+   *  llegó —modo archivo sin base, o la base caída— se cae a la clave sola:
+   *  un combo con el id es peor que con el nombre, pero mucho mejor que uno
+   *  vacío. */
+  private readonly nombrePorTienda = computed(() => {
+    const m = new Map<string, string>();
+    for (const t of this.tiendasDisponibles()) if (t.nombre) m.set(t.tienda, t.nombre);
+    return m;
+  });
+
+  etiquetaTienda(id: string): string {
+    const nombre = this.nombrePorTienda().get(id);
+    return nombre ? `${id} · ${nombre}` : id;
+  }
 
   readonly causas = computed(() => {
     const vistas = new Map<string, string>();
@@ -578,6 +607,28 @@ export class App {
     if (valor === null) return '0%';
     return `${Math.max((valor / this.maximoDia(campo)) * 100, 2)}%`;
   }
+
+  // -- cuánta historia hay cargada ----------------------------------------
+  //
+  // Los paneles de tendencia del boceto piden seis meses. Se sale de la
+  // ventana que reporta BOPS_OSA, que es la fuente que define qué días entran
+  // al análisis — no del periodo pedido, que puede ser más ancho que el dato.
+
+  private readonly ventanaBops = computed(() =>
+    (this.resultado()?.fuentes ?? []).find((f) => f.hoja === 'BOPS_OSA') ?? null,
+  );
+
+  readonly diasDeHistoria = computed(() => {
+    const f = this.ventanaBops();
+    if (!f?.desde || !f?.hasta) return 0;
+    const ms = new Date(f.hasta).getTime() - new Date(f.desde).getTime();
+    return Math.round(ms / 86_400_000) + 1;
+  });
+
+  readonly rangoHistoria = computed(() => {
+    const f = this.ventanaBops();
+    return f?.desde && f?.hasta ? `${f.desde} a ${f.hasta}` : null;
+  });
 
   // -- ayudas de presentación ---------------------------------------------
 

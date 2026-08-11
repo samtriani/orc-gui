@@ -510,14 +510,19 @@ tr.fila-mal td {
   border-radius: 2px 2px 0 0;
 }
 
+/* Las tres series usan los slots validados de la paleta de marca, en el
+   mismo orden que la leyenda. El color va SIEMPRE acompañado de leyenda,
+   posición fija dentro del día y tooltip por barra: en all-pairs esta
+   paleta no separa lo suficiente, así que la identidad nunca descansa
+   sólo en el hue. */
 .expediente-barra.tienda i {
-  background: var(--acento);
+  background: var(--s1);
 }
 .expediente-barra.venta i {
-  background: var(--bien);
+  background: var(--s3);
 }
 .expediente-barra.cedis i {
-  background: var(--tinta);
+  background: var(--s2);
 }
 
 .expediente-marcas {
@@ -746,4 +751,206 @@ h3 .filtrado {
   font-weight: 400;
   font-size: 12px;
   color: var(--acento);
+}
+
+/* ======================================================================
+   IDENTIDAD GRUPO LA COMER — paleta de series y cromo de dashboard
+   ======================================================================
+   Los seis hues son los de los formatos del grupo. El ORDEN no es
+   cosmético: es el mecanismo de seguridad para daltonismo. Validado con
+   el validador de la guía de dataviz contra la superficie blanca de las
+   tarjetas, lista de pares adyacente (la correcta para barras y stacks):
+
+     banda de luminosidad  PASS   los 6 dentro de L 0.43–0.77
+     piso de croma         PASS   los 6 >= 0.1
+     separación CVD        PASS   peor adyacente ΔE 14.8 (deutan)
+     visión normal         PASS   peor adyacente ΔE 21.3
+     contraste vs blanco   PASS   los 6 >= 3:1
+
+   En all-pairs NO pasa —ninguna combinación de 4+ lo hace con el naranja
+   de marca fijo—, así que la identidad nunca descansa sólo en el color:
+   leyenda siempre visible, orden de posición fijo dentro de cada día y
+   tooltip por barra. Si se agrega una séptima serie, NO se inventa un
+   hue: se pliega a "Otros" o se separa en otra gráfica.
+   ------------------------------------------------------------------- */
+:host {
+  --s1: #f0501e;  /* Inventario Tienda — naranja La Comer */
+  --s2: #0079c1;  /* Inventario CEDIS */
+  --s3: #4e8b2c;  /* Venta */
+  --s4: #7b2d8e;  /* Pedido Tienda */
+  --s5: #c8102e;  /* Transf. CEDIS */
+  --s6: #00a199;  /* Pedido a Proveedor */
+
+  --rejilla: #ececf1;   /* retícula, deliberadamente recesiva */
+  --eje: #c9c9d2;
+}
+
+/* -------- franja multicolor del grupo, en el header -------- */
+.franja {
+  display: flex;
+  height: 4px;
+}
+.franja i {
+  flex: 1;
+}
+.franja i:nth-child(1) { background: var(--s1); }
+.franja i:nth-child(2) { background: var(--s4); }
+.franja i:nth-child(3) { background: var(--s3); }
+.franja i:nth-child(4) { background: var(--s2); }
+
+/* La marca de la barra superior pasa de un bloque naranja a las cuatro
+   barras del logo, apiladas en vertical. */
+.acento {
+  display: flex;
+  flex-direction: column;
+  width: 6px;
+  height: 40px;
+  gap: 2px;
+  background: none;
+  border-radius: 0;
+}
+.acento i {
+  flex: 1;
+  border-radius: 1px;
+}
+.acento i:nth-child(1) { background: var(--s1); }
+.acento i:nth-child(2) { background: var(--s4); }
+.acento i:nth-child(3) { background: var(--s3); }
+.acento i:nth-child(4) { background: var(--s2); }
+
+/* -------- tarjetas de KPI -------- */
+/* Cada tarjeta lleva una guía de color arriba, del mismo grosor que la
+   franja del header, para que la portada se lea como una sola pieza. */
+.cifra {
+  position: relative;
+  overflow: hidden;
+  padding-top: 18px;
+}
+.cifra::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--s1);
+}
+.cifras .cifra:nth-child(2)::before { background: var(--s4); }
+.cifras .cifra:nth-child(3)::before { background: var(--s3); }
+.cifras .cifra:nth-child(4)::before { background: var(--s2); }
+.cifras .cifra:nth-child(5)::before { background: var(--s6); }
+.cifra strong {
+  font-size: 30px;
+  letter-spacing: -0.01em;
+}
+a.descarga::before { background: var(--acento) !important; }
+
+/* -------- rejilla de dashboard -------- */
+.rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+/* -------- leyenda de series -------- */
+.leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 4px 0 14px;
+  font-size: 12px;
+  color: var(--tinta-suave);
+}
+.leyenda span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* La muestra de color va junto al texto, nunca coloreando el texto: la
+   tinta se queda en los tokens de texto y el color sólo lo lleva la marca. */
+.leyenda i {
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  flex: none;
+}
+
+/* -------- panel sin datos (los tres del boceto que faltan) -------- */
+/*
+   Se maquetan en vez de esconderse: un hueco no dice nada, y un panel
+   que declara QUÉ le falta y DESDE CUÁNDO convierte el vacío en una
+   petición concreta. El esqueleto de barras es decorativo y va en gris
+   —nunca en color de serie— para que no se confunda con un dato real.
+*/
+.sin-datos {
+  border-style: dashed;
+}
+.sin-datos h2 {
+  color: var(--tinta-suave);
+}
+.fantasma {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 110px;
+  margin: 8px 0 16px;
+  opacity: 0.55;
+}
+.fantasma i {
+  flex: 1;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--rejilla),
+    var(--rejilla) 4px,
+    #fff 4px,
+    #fff 8px
+  );
+  border: 1px solid var(--linea);
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+}
+.faltante {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--medio-fondo);
+  border: 1px solid var(--medio);
+  font-size: 13px;
+}
+.faltante b {
+  color: var(--medio);
+}
+.faltante p {
+  margin: 4px 0 0;
+}
+.faltante .dato {
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------- cascada de causas raíz -------- */
+/* Una sola serie: todo lo recuperable comparte color y la identidad la lleva
+   la etiqueta de la fila. El extremo verde marca la meta alcanzable. */
+.agua-barra i.recuperable {
+  background: var(--s1);
+}
+.agua-fila.potencial .agua-val {
+  color: var(--s3);
+}
+.agua-fila.potencial .agua-eti {
+  color: var(--s3);
+}
+
+/* -------- delta contra el periodo anterior, en la tarjeta de OSA -------- */
+/* Va con flecha + texto, nunca sólo color: un delta que se distingue por
+   verde/rojo es invisible para buena parte de la gente. */
+.delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.delta.nd {
+  color: var(--tinta-suave);
 }
