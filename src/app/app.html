@@ -119,6 +119,21 @@
       </section>
     }
 
+    <!-- El backend rechazó con 409 porque ya hay uno corriendo. No es un
+         error: encolar otro no lo apura, así que se ofrece seguir el que va. -->
+    @if (yaHayUno(); as a) {
+      <div class="caja-accion">
+        <div>
+          <strong>Ya hay un análisis en curso.</strong>
+          <p class="nota">
+            El servidor corre uno a la vez, así que pedir otro sólo lo pondría a
+            esperar turno. El que va ahora es <b>{{ a.archivo }}</b>.
+          </p>
+        </div>
+        <button class="btn" (click)="seguirElQueVa()">Seguir ese</button>
+      </div>
+    }
+
     @if (error(); as e) {
       <p class="aviso mal">{{ e }}</p>
     }
@@ -128,17 +143,36 @@
   @if (paso() === 'trabajando') {
     <section class="tarjeta centro">
       <div class="girando"></div>
-      <p>Validando la captura y clasificando los días con faltante…</p>
+
+      @if (fase() === 'en_cola') {
+        <p>Esperando turno…</p>
+        <p class="nota">
+          El servidor corre un análisis a la vez.
+          @if (delante()) {
+            Hay {{ delante() }} adelante.
+          }
+        </p>
+      } @else {
+        <p>Validando la captura y clasificando los días con faltante…</p>
+      }
+
       <p class="nota">
         {{ etiquetaTrabajo() }}
         @if (segundos()) {
           · {{ segundos() | number: '1.0-0' }} s
+          {{ fase() === 'en_cola' ? 'en cola' : 'corriendo' }}
         }
       </p>
       <p class="nota">
         Con la captura completa son millones de filas: la corrida tarda un par de
         minutos. Se puede dejar la pestaña abierta.
       </p>
+
+      @if (idEnVuelo()) {
+        <button class="btn-plano" [disabled]="cancelando()" (click)="cancelarEnVuelo()">
+          {{ cancelando() ? 'Cancelando…' : 'Cancelar' }}
+        </button>
+      }
     </section>
   }
 

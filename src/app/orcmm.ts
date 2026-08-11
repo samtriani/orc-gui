@@ -168,10 +168,15 @@ export interface Correccion {
 export interface Analisis {
   id: string;
   archivo: string;
-  estado: 'en_proceso' | 'ok' | 'bloqueado' | 'sin_datos';
+  estado: 'en_proceso' | 'ok' | 'bloqueado' | 'sin_datos' | 'cancelado';
 
-  /** Sólo en 'en_proceso': cuánto lleva corriendo. */
+  /** Sólo en 'en_proceso'. 'en_cola' es esperar turno —el servidor corre un
+   *  análisis a la vez— y no es lo mismo que estar trabajando. */
+  fase?: 'en_cola' | 'corriendo';
+  /** Sólo en 'en_proceso': segundos EN LA FASE actual, no desde que se pidió. */
   segundos?: number;
+  /** Sólo en 'en_cola': cuántos hay formados adelante. */
+  delante?: number;
 
   // estado 'bloqueado'
   valido?: boolean;
@@ -328,6 +333,18 @@ export class Orcmm {
 
   urlDescarga(id: string): string {
     return `${this.base}/resultado/${id}`;
+  }
+
+  /** Engancha con un análisis que ya viene corriendo, sin encolar otro. Es lo
+   *  que se ofrece cuando el backend responde 409 porque ya hay uno en vuelo. */
+  seguirExistente(id: string): Observable<Analisis> {
+    return this.seguir(id);
+  }
+
+  cancelar(id: string): Observable<{ libero_el_turno: boolean; detalle: string }> {
+    return this.http.delete<{ libero_el_turno: boolean; detalle: string }>(
+      `${this.base}/analizar/${id}`,
+    );
   }
 
   /** Tiendas con datos ya cargados en Postgres, para el selector de "elegir

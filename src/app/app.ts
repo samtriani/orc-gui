@@ -1,5 +1,6 @@
 import { DecimalPipe, PercentPipe, SlicePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
+import { Observable } from 'rxjs';
 import { Analisis, CitaFallada, Expediente, FilaProveedor, FilaSkuTienda, Orcmm, Tienda } from './orcmm';
 import { Paginador, PaginadorCtrl } from './paginacion';
 
@@ -70,8 +71,15 @@ export class App {
   readonly error = signal<string | null>(null);
   readonly arrastrando = signal(false);
   readonly verDetalle = signal(false);
-  /** Cuánto lleva corriendo el análisis, según el backend. */
+  /** Cuánto lleva EN SU FASE actual, según el backend. */
   readonly segundos = signal(0);
+  readonly fase = signal<'en_cola' | 'corriendo'>('corriendo');
+  readonly delante = signal(0);
+  /** El id en vuelo, para poder cancelarlo. */
+  readonly idEnVuelo = signal<string | null>(null);
+  readonly cancelando = signal(false);
+  /** Cuando el backend rechaza por 409, el análisis que ya estaba corriendo. */
+  readonly yaHayUno = signal<{ id: string; archivo: string } | null>(null);
 
   // -- analizar desde la base de datos (tienda + periodo) ------------------
 
@@ -213,14 +221,41 @@ export class App {
     const archivos = this.archivos();
     if (!archivos.length) return;
 
+    this.enganchar(
+      this.api.analizar(archivos, corregir, forzar),
+      'No se pudo contactar al backend. Revisar que esté corriendo en el puerto 8000.',
+    );
+  }
+
+  /**
+   * Todo lo que hay que hacer con un análisis en vuelo, para las dos rutas
+   * (archivo y tienda), que hacían exactamente lo mismo por duplicado.
+   *
+   * El 409 no es un error: es el backend diciendo "ya hay uno corriendo, el
+   * servidor lleva uno a la vez". Encolar otro no lo apura, así que en vez de
+   * enseñar un error se ofrece seguir el que ya va.
+   */
+  private enganchar(flujo: Observable<Analisis>, mensajeError: string): void {
     this.paso.set('trabajando');
     this.error.set(null);
+    this.yaHayUno.set(null);
     this.segundos.set(0);
+    this.fase.set('corriendo');
+    this.delante.set(0);
+    this.cancelando.set(false);
 
-    this.api.analizar(archivos, corregir, forzar).subscribe({
+    flujo.subscribe({
       next: (r) => {
+        this.idEnVuelo.set(r.id);
         if (r.estado === 'en_proceso') {
           this.segundos.set(r.segundos ?? 0);
+          this.fase.set(r.fase ?? 'corriendo');
+          this.delante.set(r.delante ?? 0);
+          return;
+        }
+        this.idEnVuelo.set(null);
+        if (r.estado === 'cancelado') {
+          this.reiniciar();
           return;
         }
         this.resultado.set(r);
@@ -230,11 +265,35 @@ export class App {
         if (r.estado === 'ok') this.asegurarNombresDeTienda();
       },
       error: (e) => {
-        this.error.set(
-          e?.error?.detail ??
-            'No se pudo contactar al backend. Revisar que esté corriendo en el puerto 8000.',
-        );
+        this.idEnVuelo.set(null);
+        const d = e?.error?.detail;
+        if (e?.status === 409 && d?.id_activo) {
+          this.yaHayUno.set({ id: d.id_activo, archivo: d.archivo });
+          this.paso.set('inicio');
+          return;
+        }
+        this.error.set(typeof d === 'string' ? d : mensajeError);
         this.paso.set('error');
+      },
+    });
+  }
+
+  /** Engancha con el análisis que ya venía corriendo, sin encolar otro. */
+  seguirElQueVa(): void {
+    const activo = this.yaHayUno();
+    if (!activo) return;
+    this.enganchar(this.api.seguirExistente(activo.id), 'Se perdió el análisis en curso.');
+  }
+
+  cancelarEnVuelo(): void {
+    const id = this.idEnVuelo();
+    if (!id || this.cancelando()) return;
+    this.cancelando.set(true);
+    this.api.cancelar(id).subscribe({
+      next: () => this.reiniciar(),
+      error: () => {
+        this.cancelando.set(false);
+        this.error.set('No se pudo cancelar el análisis.');
       },
     });
   }
@@ -310,27 +369,10 @@ export class App {
     const hasta = this.fechaHasta();
     if (!tienda || !desde || !hasta) return;
 
-    this.paso.set('trabajando');
-    this.error.set(null);
-    this.segundos.set(0);
-
-    this.api.analizarPorTienda(tienda, desde, hasta).subscribe({
-      next: (r) => {
-        if (r.estado === 'en_proceso') {
-          this.segundos.set(r.segundos ?? 0);
-          return;
-        }
-        this.resultado.set(r);
-        this.paso.set(
-          r.estado === 'ok' ? 'listo' : r.estado === 'sin_datos' ? 'sin-datos' : 'bloqueado',
-        );
-        if (r.estado === 'ok') this.asegurarNombresDeTienda();
-      },
-      error: (e) => {
-        this.error.set(e?.error?.detail ?? 'No se pudo analizar desde la base de datos.');
-        this.paso.set('error');
-      },
-    });
+    this.enganchar(
+      this.api.analizarPorTienda(tienda, desde, hasta),
+      'No se pudo analizar desde la base de datos.',
+    );
   }
 
   // -- portada ejecutiva ---------------------------------------------------
