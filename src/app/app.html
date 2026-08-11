@@ -304,7 +304,7 @@
         </div>
         <div class="cifra">
           <span class="etiqueta">Venta perdida</span>
-          <strong>{{ r.cobertura!.venta_perdida_en_alcance | number: '1.0-0' }}</strong>
+          <strong>${{ r.cobertura!.venta_perdida_en_alcance | number: '1.0-0' }}</strong>
           <span class="pie">
             {{ r.cobertura!.cobertura_venta_perdida_alcance_pct }}% explicada
           </span>
@@ -339,12 +339,27 @@
         <div class="filtros-fila">
           <label class="campo ancho">
             <span>SKU</span>
-            <input
-              type="search"
-              placeholder="Pega o escribe un SKU — p. ej. 663985002478"
-              [value]="filtroSku()"
-              (input)="ponSku($event)"
-            />
+            <div class="campo-multi">
+              @for (s of filtroSku(); track s) {
+                <span class="ficha-filtro">
+                  {{ s }}
+                  <button type="button" (click)="quitarSku(s)" title="Quitar">×</button>
+                </span>
+              }
+              <input
+                type="search"
+                list="lista-skus"
+                placeholder="Pega o escribe un SKU y dale Enter — p. ej. 663985002478"
+                [value]="entradaSku()"
+                (input)="ponEntradaSku($event)"
+                (keydown)="agregarSku($event)"
+              />
+              <datalist id="lista-skus">
+                @for (s of skusDisponibles(); track s) {
+                  <option [value]="s"></option>
+                }
+              </datalist>
+            </div>
           </label>
 
           <label class="campo">
@@ -381,14 +396,29 @@
             </select>
           </label>
 
-          <label class="campo">
+          <label class="campo ancho">
             <span>Proveedor</span>
-            <input
-              type="search"
-              placeholder="Nombre del proveedor"
-              [value]="filtroProveedor()"
-              (input)="ponProveedor($event)"
-            />
+            <div class="campo-multi">
+              @for (p of filtroProveedor(); track p) {
+                <span class="ficha-filtro">
+                  {{ p }}
+                  <button type="button" (click)="quitarProveedor(p)" title="Quitar">×</button>
+                </span>
+              }
+              <input
+                type="search"
+                list="lista-proveedores"
+                placeholder="Nombre del proveedor y Enter"
+                [value]="entradaProveedor()"
+                (input)="ponEntradaProveedor($event)"
+                (keydown)="agregarProveedor($event)"
+              />
+              <datalist id="lista-proveedores">
+                @for (p of proveedoresDisponibles(); track p) {
+                  <option [value]="p"></option>
+                }
+              </datalist>
+            </div>
           </label>
 
           @if (hayFiltro()) {
@@ -406,7 +436,7 @@
             <div class="ficha-datos">
               <span><b>{{ f.diasConFaltante | number }}</b> días con faltante</span>
               <span><b>{{ f.diasClasificados | number }}</b> explicados</span>
-              <span><b>{{ f.ventaPerdida | number: '1.0-0' }}</b> de venta perdida</span>
+              <span><b>${{ f.ventaPerdida | number: '1.0-0' }}</b> de venta perdida</span>
               @if (f.citas) {
                 <span><b>{{ f.citas }}</b> citas falladas</span>
               }
@@ -421,7 +451,7 @@
 
         @if (skuSinFaltantes()) {
           <div class="ficha vacia">
-            <b>Ese SKU no aparece en el análisis.</b>
+            <b>{{ filtroSku().length > 1 ? 'Esos SKU no aparecen' : 'Ese SKU no aparece' }} en el análisis.</b>
             <p>
               Sólo puede ser por dos razones, y ninguna es que no exista: o
               <b>no tuvo un solo día con faltante</b> en el periodo —está sano y BOPS nunca lo
@@ -543,7 +573,7 @@
                   <i [style.width]="anchoSku(s.venta_perdida)" [style.background]="color(s.root_cause_id)"></i>
                 </span>
                 <span class="agua-val">
-                  {{ s.venta_perdida | number: '1.0-0' }}
+                  ${{ s.venta_perdida | number: '1.0-0' }}
                   <small>{{ s.causa }}</small>
                 </span>
               </div>
@@ -592,7 +622,7 @@
                     {{ c.causa }}
                   </td>
                   <td class="num">{{ c.dias }}</td>
-                  <td class="num">{{ c.venta_perdida | number: '1.2-2' }}</td>
+                  <td class="num">${{ c.venta_perdida | number: '1.2-2' }}</td>
                   <td class="num">
                     <div class="barra-pct"><span [style.width.%]="c.pct"></span></div>
                     {{ c.pct }}%
@@ -621,7 +651,7 @@
                 <tr>
                   <td>{{ x.responsable }}</td>
                   <td class="num">{{ x.dias }}</td>
-                  <td class="num">{{ x.venta_perdida | number: '1.2-2' }}</td>
+                  <td class="num">${{ x.venta_perdida | number: '1.2-2' }}</td>
                   <td class="num">
                     <div class="barra-pct"><span [style.width.%]="x.pct"></span></div>
                     {{ x.pct }}%
@@ -703,7 +733,7 @@
                   <tr>
                     <td>{{ s.subcausa }}</td>
                     <td class="num">{{ s.dias }}</td>
-                    <td class="num">{{ s.venta_perdida | number: '1.2-2' }}</td>
+                    <td class="num">${{ s.venta_perdida | number: '1.2-2' }}</td>
                   </tr>
                 }
               </tbody>
@@ -735,7 +765,7 @@
                 <tr>
                   <td><code>{{ b.campo }}</code></td>
                   <td class="num">{{ b.dias }}</td>
-                  <td class="num">{{ b.venta_perdida | number: '1.2-2' }}</td>
+                  <td class="num">${{ b.venta_perdida | number: '1.2-2' }}</td>
                   <td>{{ b.a_quien }}</td>
                 </tr>
               }
@@ -788,7 +818,7 @@
                   <td>{{ s.tienda }}</td>
                   <td class="num">{{ s.dias_clasificados }}/{{ s.dias_con_faltante }}</td>
                   <td class="num" [class.medio]="s.cobertura_pct < 100">{{ s.cobertura_pct }}%</td>
-                  <td class="num">{{ s.venta_perdida | number: '1.2-2' }}</td>
+                  <td class="num">${{ s.venta_perdida | number: '1.2-2' }}</td>
                   <td class="num">{{ s.osa_promedio }}</td>
                   <td>
                     <span class="chip" [style.background]="color(s.root_cause_id)">{{

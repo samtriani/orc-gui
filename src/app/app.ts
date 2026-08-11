@@ -420,21 +420,38 @@ export class App {
   // renglones, no miles, y el análisis tarda minutos — refiltrar contra el
   // servidor sería absurdo.
 
-  readonly filtroSku = signal('');
+  /** SKU y proveedor aceptan varios a la vez — "cualquiera de estos". Cada
+   *  uno lleva su propio texto en captura (`entradaSku`/`entradaProveedor`)
+   *  aparte del arreglo ya confirmado: escribir no filtra todavía, hay que
+   *  darle Enter (o elegir la sugerencia del <datalist>) para que se
+   *  agregue como ficha. */
+  readonly filtroSku = signal<string[]>([]);
+  readonly entradaSku = signal('');
   readonly filtroTienda = signal('');
   readonly filtroCausa = signal('');
   readonly filtroResponsable = signal('');
-  readonly filtroProveedor = signal('');
+  readonly filtroProveedor = signal<string[]>([]);
+  readonly entradaProveedor = signal('');
 
   readonly hayFiltro = computed(
     () =>
       !!(
-        this.filtroSku().trim() ||
+        this.filtroSku().length ||
         this.filtroTienda() ||
         this.filtroCausa() ||
         this.filtroResponsable() ||
-        this.filtroProveedor().trim()
+        this.filtroProveedor().length
       ),
+  );
+
+  // -- opciones de autocompletar (<datalist>), sacadas de los propios datos
+
+  readonly skusDisponibles = computed(() =>
+    [...new Set((this.resultado()?.por_sku_tienda ?? []).map((s) => s.sku))].sort(),
+  );
+
+  readonly proveedoresDisponibles = computed(() =>
+    [...new Set((this.resultado()?.proveedores ?? []).map((p) => p.nombre || p.proveedor_id))].sort(),
   );
 
   // -- opciones de los desplegables, sacadas de los propios datos ----------
@@ -470,15 +487,27 @@ export class App {
   );
 
   // -- listas filtradas ----------------------------------------------------
+  //
+  // SKU y proveedor son "cualquiera de los elegidos" (OR entre fichas), y ese
+  // resultado se cruza con AND contra el resto de los filtros — mismo criterio
+  // de siempre, sólo que ahora el de SKU/proveedor puede traer más de un valor.
+
+  /** ¿`valor` contiene a alguna de las fichas ya elegidas? Vacío el arreglo =
+   *  no filtra por esto. */
+  private coincideAlguna(valor: string, elegidas: string[]): boolean {
+    if (!elegidas.length) return true;
+    const v = normalizar(valor);
+    return elegidas.some((e) => v.includes(normalizar(e)));
+  }
 
   readonly skusFiltrados = computed<FilaSkuTienda[]>(() => {
-    const sku = normalizar(this.filtroSku());
+    const skus = this.filtroSku();
     const tienda = this.filtroTienda();
     const causa = this.filtroCausa();
     const resp = this.filtroResponsable();
     return (this.resultado()?.por_sku_tienda ?? []).filter(
       (s) =>
-        (!sku || normalizar(s.sku).includes(sku)) &&
+        this.coincideAlguna(s.sku, skus) &&
         (!tienda || s.tienda === tienda) &&
         (!causa || s.root_cause_id === causa) &&
         (!resp || s.responsable === resp),
@@ -486,12 +515,10 @@ export class App {
   });
 
   readonly citasFiltradas = computed<CitaFallada[]>(() => {
-    const sku = normalizar(this.filtroSku());
-    const prov = normalizar(this.filtroProveedor());
+    const skus = this.filtroSku();
+    const provs = this.filtroProveedor();
     return (this.resultado()?.citas_falladas ?? []).filter(
-      (c) =>
-        (!sku || normalizar(c.sku).includes(sku)) &&
-        (!prov || normalizar(c.proveedor).includes(prov)),
+      (c) => this.coincideAlguna(c.sku, skus) && this.coincideAlguna(c.proveedor, provs),
     );
   });
 
@@ -499,21 +526,21 @@ export class App {
    *  SKU, así que el filtro de SKU no puede tocarlo sin mentir. Se filtra sólo
    *  por nombre. Para ver el proveedor de un SKU está la tabla de citas. */
   readonly proveedoresFiltrados = computed<FilaProveedor[]>(() => {
-    const prov = normalizar(this.filtroProveedor());
-    return (this.resultado()?.proveedores ?? []).filter(
-      (p) => !prov || normalizar(p.nombre || p.proveedor_id).includes(prov),
+    const provs = this.filtroProveedor();
+    return (this.resultado()?.proveedores ?? []).filter((p) =>
+      this.coincideAlguna(p.nombre || p.proveedor_id, provs),
     );
   });
 
-  // -- ficha del SKU buscado ----------------------------------------------
+  // -- ficha del/los SKU buscados ------------------------------------------
 
-  /** Los renglones del SKU buscado, ignorando los demás filtros: si alguien
-   *  busca un SKU y además tiene puesto un filtro de causa, la ficha debe
-   *  hablar del SKU completo y no del recorte. */
+  /** Los renglones de los SKU elegidos, ignorando los demás filtros: si
+   *  alguien busca un SKU y además tiene puesto un filtro de causa, la ficha
+   *  debe hablar del SKU completo y no del recorte. */
   private readonly renglonesDelSku = computed<FilaSkuTienda[]>(() => {
-    const sku = normalizar(this.filtroSku());
-    if (!sku) return [];
-    return (this.resultado()?.por_sku_tienda ?? []).filter((s) => normalizar(s.sku).includes(sku));
+    const skus = this.filtroSku();
+    if (!skus.length) return [];
+    return (this.resultado()?.por_sku_tienda ?? []).filter((s) => this.coincideAlguna(s.sku, skus));
   });
 
   readonly fichaSku = computed(() => {
@@ -535,7 +562,7 @@ export class App {
    *  hay que decir por qué, porque son dos razones muy distintas y ninguna
    *  significa "no existe". */
   readonly skuSinFaltantes = computed(
-    () => !!this.filtroSku().trim() && this.renglonesDelSku().length === 0,
+    () => !!this.filtroSku().length && this.renglonesDelSku().length === 0,
   );
 
   // -- paginadores ---------------------------------------------------------
@@ -557,13 +584,50 @@ export class App {
 
   // -- handlers ------------------------------------------------------------
 
-  ponSku(e: Event): void {
-    this.filtroSku.set((e.target as HTMLInputElement).value);
+  /** Sólo captura lo que se va escribiendo — no filtra todavía. El
+   *  `<datalist>` sugiere de `skusDisponibles()` mientras tanto. */
+  ponEntradaSku(e: Event): void {
+    this.entradaSku.set((e.target as HTMLInputElement).value);
+  }
+
+  ponEntradaProveedor(e: Event): void {
+    this.entradaProveedor.set((e.target as HTMLInputElement).value);
+  }
+
+  /** Enter (o elegir una sugerencia y darle Enter) agrega la ficha. Vale
+   *  tanto un valor exacto del datalist como texto libre — igual que antes,
+   *  no hace falta que exista para poder buscarlo. */
+  agregarSku(e: KeyboardEvent): void {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const valor = this.entradaSku().trim();
+    if (!valor) return;
+    if (!this.filtroSku().some((s) => normalizar(s) === normalizar(valor))) {
+      this.filtroSku.update((skus) => [...skus, valor]);
+      this.reiniciarPaginas();
+    }
+    this.entradaSku.set('');
+  }
+
+  agregarProveedor(e: KeyboardEvent): void {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const valor = this.entradaProveedor().trim();
+    if (!valor) return;
+    if (!this.filtroProveedor().some((p) => normalizar(p) === normalizar(valor))) {
+      this.filtroProveedor.update((provs) => [...provs, valor]);
+      this.reiniciarPaginas();
+    }
+    this.entradaProveedor.set('');
+  }
+
+  quitarSku(sku: string): void {
+    this.filtroSku.update((skus) => skus.filter((s) => s !== sku));
     this.reiniciarPaginas();
   }
 
-  ponProveedor(e: Event): void {
-    this.filtroProveedor.set((e.target as HTMLInputElement).value);
+  quitarProveedor(prov: string): void {
+    this.filtroProveedor.update((provs) => provs.filter((p) => p !== prov));
     this.reiniciarPaginas();
   }
 
@@ -583,17 +647,20 @@ export class App {
   }
 
   limpiarFiltros(): void {
-    this.filtroSku.set('');
+    this.filtroSku.set([]);
+    this.entradaSku.set('');
     this.filtroTienda.set('');
     this.filtroCausa.set('');
     this.filtroResponsable.set('');
-    this.filtroProveedor.set('');
+    this.filtroProveedor.set([]);
+    this.entradaProveedor.set('');
     this.reiniciarPaginas();
   }
 
-  /** Desde el top de portada: clic en un SKU y la pantalla se filtra a él. */
+  /** Desde el top de portada: clic en un SKU y la pantalla se filtra a él
+   *  (reemplaza la selección — es "ver este SKU", no "agregar otro más"). */
   verSku(sku: string): void {
-    this.filtroSku.set(sku);
+    this.filtroSku.set([sku]);
     this.reiniciarPaginas();
     this.verDetalle.set(true);
     document.getElementById('filtros')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
