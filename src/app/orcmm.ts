@@ -119,6 +119,8 @@ export interface FilaSubcausa {
 export interface FilaSkuTienda {
   sku: string;
   tienda: string;
+  /** De CATALOGO — para poder buscar por nombre además de por código. */
+  descripcion: string | null;
   dias_con_faltante: number;
   dias_clasificados: number;
   cobertura_pct: number;

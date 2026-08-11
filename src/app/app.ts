@@ -445,10 +445,26 @@ export class App {
   );
 
   // -- opciones de autocompletar (<datalist>), sacadas de los propios datos
+  //
+  // El SKU se busca por código O por nombre: la etiqueta de la sugerencia
+  // trae los dos ("código — nombre"), así que el filtrado nativo del
+  // navegador encuentra el renglón aunque se escriba parte del nombre. Al
+  // elegir la sugerencia o darle Enter, agregarSku() se queda sólo con el
+  // código — la ficha del filtro no necesita el nombre completo.
 
-  readonly skusDisponibles = computed(() =>
-    [...new Set((this.resultado()?.por_sku_tienda ?? []).map((s) => s.sku))].sort(),
-  );
+  readonly opcionesSku = computed(() => {
+    const vistos = new Map<string, string | null>();
+    for (const s of this.resultado()?.por_sku_tienda ?? []) {
+      if (!vistos.has(s.sku)) vistos.set(s.sku, s.descripcion);
+    }
+    return [...vistos]
+      .map(([sku, descripcion]) => ({
+        sku,
+        descripcion,
+        etiqueta: descripcion ? `${sku} — ${descripcion}` : sku,
+      }))
+      .sort((a, b) => a.sku.localeCompare(b.sku));
+  });
 
   readonly proveedoresDisponibles = computed(() =>
     [...new Set((this.resultado()?.proveedores ?? []).map((p) => p.nombre || p.proveedor_id))].sort(),
@@ -492,12 +508,17 @@ export class App {
   // resultado se cruza con AND contra el resto de los filtros — mismo criterio
   // de siempre, sólo que ahora el de SKU/proveedor puede traer más de un valor.
 
-  /** ¿`valor` contiene a alguna de las fichas ya elegidas? Vacío el arreglo =
-   *  no filtra por esto. */
-  private coincideAlguna(valor: string, elegidas: string[]): boolean {
+  /** ¿alguno de `valores` (código, nombre, lo que aplique) contiene a alguna
+   *  de las fichas ya elegidas? Vacío el arreglo de fichas = no filtra por
+   *  esto. Un solo campo (proveedor) o varios (SKU: código + nombre) usan la
+   *  misma función. */
+  private coincideAlguna(valores: (string | null | undefined)[], elegidas: string[]): boolean {
     if (!elegidas.length) return true;
-    const v = normalizar(valor);
-    return elegidas.some((e) => v.includes(normalizar(e)));
+    const candidatos = valores.filter((v): v is string => !!v).map(normalizar);
+    return elegidas.some((e) => {
+      const buscado = normalizar(e);
+      return candidatos.some((v) => v.includes(buscado));
+    });
   }
 
   readonly skusFiltrados = computed<FilaSkuTienda[]>(() => {
@@ -507,7 +528,7 @@ export class App {
     const resp = this.filtroResponsable();
     return (this.resultado()?.por_sku_tienda ?? []).filter(
       (s) =>
-        this.coincideAlguna(s.sku, skus) &&
+        this.coincideAlguna([s.sku, s.descripcion], skus) &&
         (!tienda || s.tienda === tienda) &&
         (!causa || s.root_cause_id === causa) &&
         (!resp || s.responsable === resp),
@@ -518,7 +539,7 @@ export class App {
     const skus = this.filtroSku();
     const provs = this.filtroProveedor();
     return (this.resultado()?.citas_falladas ?? []).filter(
-      (c) => this.coincideAlguna(c.sku, skus) && this.coincideAlguna(c.proveedor, provs),
+      (c) => this.coincideAlguna([c.sku], skus) && this.coincideAlguna([c.proveedor], provs),
     );
   });
 
@@ -528,7 +549,7 @@ export class App {
   readonly proveedoresFiltrados = computed<FilaProveedor[]>(() => {
     const provs = this.filtroProveedor();
     return (this.resultado()?.proveedores ?? []).filter((p) =>
-      this.coincideAlguna(p.nombre || p.proveedor_id, provs),
+      this.coincideAlguna([p.nombre, p.proveedor_id], provs),
     );
   });
 
@@ -540,7 +561,9 @@ export class App {
   private readonly renglonesDelSku = computed<FilaSkuTienda[]>(() => {
     const skus = this.filtroSku();
     if (!skus.length) return [];
-    return (this.resultado()?.por_sku_tienda ?? []).filter((s) => this.coincideAlguna(s.sku, skus));
+    return (this.resultado()?.por_sku_tienda ?? []).filter((s) =>
+      this.coincideAlguna([s.sku, s.descripcion], skus),
+    );
   });
 
   readonly fichaSku = computed(() => {
@@ -585,7 +608,7 @@ export class App {
   // -- handlers ------------------------------------------------------------
 
   /** Sólo captura lo que se va escribiendo — no filtra todavía. El
-   *  `<datalist>` sugiere de `skusDisponibles()` mientras tanto. */
+   *  `<datalist>` sugiere de `opcionesSku()` mientras tanto. */
   ponEntradaSku(e: Event): void {
     this.entradaSku.set((e.target as HTMLInputElement).value);
   }
@@ -594,14 +617,18 @@ export class App {
     this.entradaProveedor.set((e.target as HTMLInputElement).value);
   }
 
-  /** Enter (o elegir una sugerencia y darle Enter) agrega la ficha. Vale
-   *  tanto un valor exacto del datalist como texto libre — igual que antes,
-   *  no hace falta que exista para poder buscarlo. */
+  /** Enter (o elegir una sugerencia y darle Enter) agrega la ficha. Si el
+   *  texto es la etiqueta completa de una sugerencia ("código — nombre"),
+   *  se queda sólo con el código — la ficha no necesita cargar el nombre.
+   *  Cualquier otro texto se agrega tal cual, igual que antes: no hace
+   *  falta que exista en este periodo para poder buscarlo. */
   agregarSku(e: KeyboardEvent): void {
     if (e.key !== 'Enter') return;
     e.preventDefault();
-    const valor = this.entradaSku().trim();
-    if (!valor) return;
+    const escrito = this.entradaSku().trim();
+    if (!escrito) return;
+    const opcion = this.opcionesSku().find((o) => normalizar(o.etiqueta) === normalizar(escrito));
+    const valor = opcion?.sku ?? escrito;
     if (!this.filtroSku().some((s) => normalizar(s) === normalizar(valor))) {
       this.filtroSku.update((skus) => [...skus, valor]);
       this.reiniciarPaginas();

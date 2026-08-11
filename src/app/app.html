@@ -349,14 +349,14 @@
               <input
                 type="search"
                 list="lista-skus"
-                placeholder="Pega o escribe un SKU y dale Enter — p. ej. 663985002478"
+                placeholder="Código o nombre del producto, y Enter"
                 [value]="entradaSku()"
                 (input)="ponEntradaSku($event)"
                 (keydown)="agregarSku($event)"
               />
               <datalist id="lista-skus">
-                @for (s of skusDisponibles(); track s) {
-                  <option [value]="s"></option>
+                @for (o of opcionesSku(); track o.sku) {
+                  <option [value]="o.etiqueta"></option>
                 }
               </datalist>
             </div>
