@@ -1,7 +1,8 @@
 import { DecimalPipe, PercentPipe, SlicePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Analisis, CitaFallada, Expediente, FilaProveedor, FilaSkuTienda, Orcmm, Tienda } from './orcmm';
+import { Analisis, CitaFallada, Expediente, FilaCausa, FilaProveedor, FilaResponsable,
+         FilaSkuTienda, Orcmm, Tienda, Waterfall } from './orcmm';
 import { Paginador, PaginadorCtrl } from './paginacion';
 
 /** Comparación laxa para los filtros de texto: sin acentos, sin mayúsculas y
@@ -66,21 +67,34 @@ const COLOR_CAUSA: Record<string, string> = {
  * usarlo. Estos pasan la banda de luminosidad, el piso de croma y el 3:1 de
  * contraste contra el blanco de la tarjeta.
  *
- * Lo que NO pasan es la separación con todos los pares: con el naranja de
- * marca fijo, ninguna combinación de seis lo hace (se probaron varias; la
- * mejor deja dos colores a ΔE 13.5 en visión normal, bajo el piso de 15).
- * Por eso el expediente lleva leyenda obligatoria con las causas que
- * aparecen en ese SKU, más el tooltip por día: la identidad está escrita y
- * el color sólo refuerza. Si se quita la leyenda, esto queda mal.
+ * El orden NO es arbitrario: está asignado por frecuencia real, para que las
+ * dos causas que de verdad coinciden en un mismo SKU queden lo más separadas
+ * posible. RC01 (94.1% de los días) contra RC06 (5.3%) miden ΔE 34.8 en
+ * visión normal y 22.8 en protanopía — o sea el 99.4% de los días se lee sin
+ * ambigüedad.
+ *
+ * RC99 va en rojo oscuro a propósito. No es una causa más: es "no supimos
+ * clasificarlo", una alarma. Antes era gris y se confundía con los días sin
+ * faltante, que también eran grises. El rojo es `#a10c22` y no el `#c8102e`
+ * de siempre porque ése queda a ΔE 12.7 del naranja de RC01 —bajo el piso de
+ * 15— mientras que éste mide 20.2.
+ *
+ * Lo que NO pasa el conjunto completo es la separación con todos los pares:
+ * los pares raros (RC03 contra RC05, RC04 contra RC05) quedan cortos, y con
+ * el naranja de marca fijo ninguna combinación de siete lo resuelve. Son
+ * causas de 0.1-0.3% que en la práctica no coinciden, pero por eso el
+ * expediente lleva leyenda obligatoria con las causas que aparecen en ese
+ * SKU, más el tooltip por día: la identidad está escrita y el color sólo
+ * refuerza. Si se quita la leyenda, esto queda mal.
  */
 const COLOR_CAUSA_TIRA: Record<string, string> = {
-  RC01: '#f0501e',
-  RC02: '#0079c1',
-  RC03: '#7b2d8e',
-  RC04: '#00a199',
-  RC05: '#4e8b2c',
-  RC06: '#c8102e',
-  RC99: '#8a8a95',
+  RC01: '#f0501e', // Ejecución en Tienda        — 94.1% de los días
+  RC06: '#0079c1', // Incumplimiento Proveedor   —  5.3%
+  RC05: '#4e8b2c', // Pedido Proveedor No Gen.   —  0.3%
+  RC02: '#7b2d8e', // Transporte / Tránsito      —  0.1%
+  RC04: '#00a199', // CEDIS No Surtió            —  0.1%
+  RC03: '#b07500', // Pedido de Tienda No Gen.
+  RC99: '#a10c22', // Sin clasificar — rojo: es una alarma, no una causa
 };
 
 @Component({
@@ -585,6 +599,149 @@ export class App {
     );
   });
 
+  // ========================================================================
+  // WATERFALL Y PARETO, RECALCULADOS CON LOS FILTROS PUESTOS
+  // ========================================================================
+  //
+  // Se recalculan aquí, en el navegador, a partir del detalle día por día
+  // que manda el backend. No se pueden sacar de `por_sku_tienda`: esa tabla
+  // trae la causa DOMINANTE de cada SKU, así que uno con RC01 unos días y
+  // RC06 otros aparece como "100% RC01" — el Pareto saldría equivocado, no
+  // sólo desactualizado.
+  //
+  // El filtro de proveedor NO entra: un día no tiene proveedor, lo tiene el
+  // pedido. Cruzarlos aquí sería inventar una relación que el dato no trae.
+
+  /** Los días que sobreviven a los filtros de SKU y tienda. Causa y
+   *  responsable se aplican después, para que el denominador del waterfall
+   *  no cambie al elegir una causa: el universo lo define qué SKU estás
+   *  mirando, no qué causa. */
+  private readonly diasDelAlcance = computed(() => {
+    const det = this.resultado()?.detalle_dias;
+    if (!det) return [];
+    const skus = this.filtroSku();
+    const tienda = this.filtroTienda();
+    return det.dias.filter(
+      (d) =>
+        this.coincideAlguna([d.s, this.descripcionDe(d.s)], skus) &&
+        (!tienda || d.t === tienda),
+    );
+  });
+
+  /** sku -> descripción, para que filtrar por nombre también recorte estos
+   *  cálculos y no sólo la tabla de detalle. */
+  private readonly descripcionPorSku = computed(() => {
+    const m = new Map<string, string | null>();
+    for (const s of this.resultado()?.por_sku_tienda ?? []) m.set(s.sku, s.descripcion);
+    return m;
+  });
+
+  private descripcionDe(sku: string): string | null {
+    return this.descripcionPorSku().get(sku) ?? null;
+  }
+
+  /** Las filas de BOPS del alcance que quedan bajo el filtro de SKU/tienda.
+   *  Es el denominador del waterfall: sin recomponerlo, filtrar a un SKU
+   *  dejaría los puntos de OSA calculados sobre la tienda entera. */
+  private readonly universoFiltrado = computed(() => {
+    const det = this.resultado()?.detalle_dias;
+    if (!det) return 0;
+    const skus = this.filtroSku();
+    const tienda = this.filtroTienda();
+    return det.universo
+      .filter(
+        (u) =>
+          this.coincideAlguna([u.s, this.descripcionDe(u.s)], skus) &&
+          (!tienda || u.t === tienda),
+      )
+      .reduce((a, u) => a + u.n, 0);
+  });
+
+  /** Los días ya con los cuatro filtros aplicados. */
+  private readonly diasFiltrados = computed(() => {
+    const det = this.resultado()?.detalle_dias;
+    if (!det) return [];
+    const causa = this.filtroCausa();
+    const resp = this.filtroResponsable();
+    return this.diasDelAlcance().filter((d) => {
+      const c = det.causas[d.c];
+      return (!causa || c.root_cause_id === causa) && (!resp || c.responsable === resp);
+    });
+  });
+
+  readonly waterfallFiltrado = computed<Waterfall | null>(() => {
+    const det = this.resultado()?.detalle_dias;
+    const base = this.resultado()?.waterfall;
+    if (!det || !base) return null;
+    if (!this.hayFiltro()) return base;
+
+    const universo = this.universoFiltrado();
+    if (!universo) return { ...base, osa_real: null, universo_filas: 0, escalones: [] };
+
+    const dias = new Map<number, number>();
+    for (const d of this.diasFiltrados()) dias.set(d.c, (dias.get(d.c) ?? 0) + 1);
+
+    const escalones = [...dias]
+      .map(([i, n]) => ({
+        root_cause_id: det.causas[i].root_cause_id,
+        causa: det.causas[i].causa,
+        responsable: det.causas[i].responsable,
+        dias: n,
+        puntos_osa: Math.round((n / universo) * 10000) / 100,
+      }))
+      .sort((a, b) => b.puntos_osa - a.puntos_osa);
+
+    const perdidos = escalones.reduce((a, e) => a + e.puntos_osa, 0);
+    return {
+      osa_teorico: 100,
+      osa_real: Math.round((100 - perdidos) * 10) / 10,
+      universo_filas: universo,
+      escalones,
+    };
+  });
+
+  /** Agrega los días filtrados por una llave de la causa (id o responsable).
+   *  Los dos Pareto son el mismo cálculo con distinto agrupador. */
+  private paretoPor(porResponsable: boolean): FilaCausa[] {
+    const det = this.resultado()?.detalle_dias;
+    if (!det) return [];
+    const acc = new Map<string, { dias: number; vp: number; c: number }>();
+    for (const d of this.diasFiltrados()) {
+      const c = det.causas[d.c];
+      const llave = porResponsable ? c.responsable : c.causa;
+      const a = acc.get(llave) ?? { dias: 0, vp: 0, c: d.c };
+      a.dias += 1;
+      a.vp += d.v;
+      acc.set(llave, a);
+    }
+    const total = [...acc.values()].reduce((a, x) => a + x.vp, 0);
+    return [...acc]
+      .map(([llave, a]) => ({
+        root_cause_id: det.causas[a.c].root_cause_id,
+        causa: llave,
+        responsable: det.causas[a.c].responsable,
+        dias: a.dias,
+        venta_perdida: Math.round(a.vp * 100) / 100,
+        pct: total ? Math.round((a.vp / total) * 1000) / 10 : 0,
+      }))
+      .sort((x, y) => y.venta_perdida - x.venta_perdida || y.dias - x.dias);
+  }
+
+  readonly porCausaFiltrado = computed<FilaCausa[]>(() =>
+    this.hayFiltro() ? this.paretoPor(false) : (this.resultado()?.por_causa ?? []),
+  );
+
+  readonly porResponsableFiltrado = computed<FilaResponsable[]>(() =>
+    this.hayFiltro()
+      ? this.paretoPor(true).map(({ causa, dias, venta_perdida, pct }) => ({
+          responsable: causa,
+          dias,
+          venta_perdida,
+          pct,
+        }))
+      : (this.resultado()?.por_responsable ?? []),
+  );
+
   // -- ficha del/los SKU buscados ------------------------------------------
 
   /** Los renglones de los SKU elegidos, ignorando los demás filtros: si
@@ -628,13 +785,14 @@ export class App {
   readonly pgSkus = new Paginador(this.skusFiltrados);
   readonly pgProveedores = new Paginador(this.proveedoresFiltrados);
   readonly pgCitas = new Paginador(this.citasFiltradas);
-  readonly pgCausas = new Paginador(computed(() => this.resultado()?.por_causa ?? []));
-  readonly pgResponsables = new Paginador(computed(() => this.resultado()?.por_responsable ?? []));
+  readonly pgCausas = new Paginador(this.porCausaFiltrado);
+  readonly pgResponsables = new Paginador(this.porResponsableFiltrado);
   readonly pgSubcausas = new Paginador(computed(() => this.resultado()?.por_subcausa ?? []));
   readonly pgBloqueos = new Paginador(computed(() => this.resultado()?.cobertura?.bloqueos ?? []));
 
   private reiniciarPaginas(): void {
-    for (const p of [this.pgSkus, this.pgProveedores, this.pgCitas]) p.reiniciar();
+    for (const p of [this.pgSkus, this.pgProveedores, this.pgCitas,
+                     this.pgCausas, this.pgResponsables]) p.reiniciar();
   }
 
   // -- handlers ------------------------------------------------------------

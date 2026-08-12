@@ -469,7 +469,7 @@
       </section>
 
       <!-- waterfall: de 100% al OSA real, en puntos -->
-      @if (r.waterfall?.escalones?.length) {
+      @if (waterfallFiltrado(); as wf) {
         <section class="tarjeta">
           <h2>Causas raíz de faltantes</h2>
           <p class="nota">
@@ -485,9 +485,9 @@
             <div class="agua-fila extremo">
               <span class="agua-eti">OSA real del periodo</span>
               <span class="agua-barra"></span>
-              <span class="agua-val">{{ r.waterfall!.osa_real }}%</span>
+              <span class="agua-val">{{ wf.osa_real ?? "—" }}%</span>
             </div>
-            @for (e of r.waterfall!.escalones; track e.root_cause_id) {
+            @for (e of wf.escalones; track e.root_cause_id) {
               <div class="agua-fila">
                 <span class="agua-eti" [title]="e.responsable">
                   {{ e.root_cause_id }} · {{ e.causa }}
@@ -504,7 +504,7 @@
             <div class="agua-fila extremo final potencial">
               <span class="agua-eti">OSA potencial</span>
               <span class="agua-barra"></span>
-              <span class="agua-val">{{ r.waterfall!.osa_teorico }}%</span>
+              <span class="agua-val">{{ wf.osa_teorico }}%</span>
             </div>
           </div>
         </section>
@@ -998,7 +998,8 @@
                   <span class="expediente-dia-num">{{ d.fecha | slice: 8 : 10 }}</span>
                   <span
                     class="expediente-causa"
-                    [style.background]="d.root_cause_id ? colorTira(d.root_cause_id) : 'var(--rejilla)'"
+                    [class.sin-faltante]="!d.root_cause_id"
+                    [style.background]="d.root_cause_id ? colorTira(d.root_cause_id) : ''"
                     [title]="d.root_cause_id ? d.root_cause_id + ' · ' + d.causa_raiz : 'Sin faltante'"
                   ></span>
                 </div>
@@ -1020,7 +1021,7 @@
                 @for (c of causasDelExpediente(); track c.id) {
                   <span><i [style.background]="colorTira(c.id)"></i>{{ c.id }} · {{ c.causa }}</span>
                 }
-                <span><i style="background: var(--rejilla)"></i>Sin faltante</span>
+                <span><i class="sin-faltante"></i>Sin faltante</span>
               </div>
             }
 

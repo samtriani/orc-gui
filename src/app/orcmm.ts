@@ -160,6 +160,26 @@ export interface CitaFallada {
   estatus: string;
 }
 
+/**
+ * El detalle día por día, comprimido, para poder recalcular el waterfall y
+ * los Pareto cuando el usuario filtra.
+ *
+ * Hace falta porque `por_sku_tienda` sólo trae la causa DOMINANTE de cada
+ * SKU: uno con RC01 unos días y RC06 otros se ve ahí como "100% RC01", así
+ * que recalcular desde esa tabla daría números equivocados.
+ *
+ * Viene comprimido — las causas en un catálogo aparte y cada día con su
+ * índice — para no repetir los textos en ~5,200 renglones.
+ */
+export interface DetalleDias {
+  causas: { root_cause_id: string; causa: string; responsable: string }[];
+  /** s=sku · t=tienda · c=índice en `causas` · v=venta perdida. */
+  dias: { s: string; t: string; c: number; v: number }[];
+  /** Filas de BOPS del alcance por SKU-tienda: el denominador del waterfall,
+   *  desglosado para poder recomponerlo al filtrar. */
+  universo: { s: string; t: string; n: number }[];
+}
+
 export interface Correccion {
   cambios: string[];
   errores_que_siguen: string[];
@@ -212,6 +232,7 @@ export interface Analisis {
   por_responsable?: FilaResponsable[];
   por_subcausa?: FilaSubcausa[];
   por_sku_tienda?: FilaSkuTienda[];
+  detalle_dias?: DetalleDias;
   proveedores?: FilaProveedor[];
   citas_falladas?: CitaFallada[];
   discrepancias?: { folio: string; sku: string; motivos: string }[];
