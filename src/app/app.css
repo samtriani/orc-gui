@@ -1022,3 +1022,13 @@ a.descarga::before { background: var(--acento) !important; }
   color: var(--s3);
 }
 
+
+/* Dia sin faltante. Antes era var(--rejilla), el mismo gris que traia RC99,
+   y no se distinguian. Verde palido con borde: dice "todo bien" de un
+   vistazo y es el unico relleno claro de la tira, asi que no se confunde
+   con ninguna causa — todas son colores plenos. */
+.expediente-causa.sin-faltante,
+.leyenda i.sin-faltante {
+  background: #dff0d6;
+  box-shadow: inset 0 0 0 1px #86b97e, 0 0 0 1px #fff;
+}
