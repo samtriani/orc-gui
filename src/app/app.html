@@ -510,53 +510,55 @@
         </section>
       }
 
-      <!-- ============ PANELES DEL BOCETO QUE AÚN NO TIENEN DATOS ============
-           Se maquetan en vez de esconderse: un hueco no explica nada, y un
-           panel que declara qué le falta y desde cuándo convierte el vacío en
-           una petición concreta. El esqueleto va rayado en gris —jamás en
-           color de serie— para que nadie lo confunda con un dato real. -->
-      <div class="rejilla">
-        <section class="tarjeta sin-datos">
-          <h2>Tendencia de OSA vs. meta</h2>
-          <p class="nota">Últimos 6 meses · meta 95.0%</p>
-          <div class="fantasma" aria-hidden="true">
-            <i style="height: 62%"></i><i style="height: 48%"></i><i style="height: 71%"></i>
-            <i style="height: 66%"></i><i style="height: 55%"></i><i style="height: 60%"></i>
-          </div>
-          <div class="faltante">
-            <div>
-              <b>Faltan meses de historia.</b>
-              <p>
-                Hay <span class="dato">{{ diasDeHistoria() }} días</span> cargados
-                @if (rangoHistoria(); as h) {
-                  (<span class="dato">{{ h }}</span>)
-                }
-                y este panel necesita seis meses cerrados. Se enciende solo en cuanto
-                se carguen los periodos anteriores.
-              </p>
+      @if (mostrarPanelesSinDatos) {
+        <!-- ============ PANELES DEL BOCETO QUE AÚN NO TIENEN DATOS ============
+             Se maquetan en vez de esconderse: un hueco no explica nada, y un
+             panel que declara qué le falta y desde cuándo convierte el vacío en
+             una petición concreta. El esqueleto va rayado en gris —jamás en
+             color de serie— para que nadie lo confunda con un dato real. -->
+        <div class="rejilla">
+          <section class="tarjeta sin-datos">
+            <h2>Tendencia de OSA vs. meta</h2>
+            <p class="nota">Últimos 6 meses · meta 95.0%</p>
+            <div class="fantasma" aria-hidden="true">
+              <i style="height: 62%"></i><i style="height: 48%"></i><i style="height: 71%"></i>
+              <i style="height: 66%"></i><i style="height: 55%"></i><i style="height: 60%"></i>
             </div>
-          </div>
-        </section>
+            <div class="faltante">
+              <div>
+                <b>Faltan meses de historia.</b>
+                <p>
+                  Hay <span class="dato">{{ diasDeHistoria() }} días</span> cargados
+                  @if (rangoHistoria(); as h) {
+                    (<span class="dato">{{ h }}</span>)
+                  }
+                  y este panel necesita seis meses cerrados. Se enciende solo en cuanto
+                  se carguen los periodos anteriores.
+                </p>
+              </div>
+            </div>
+          </section>
 
-        <section class="tarjeta sin-datos">
-          <h2>Evolución del mix de causas raíz</h2>
-          <p class="nota">Cómo se reparte el gap mes a mes</p>
-          <div class="fantasma" aria-hidden="true">
-            <i style="height: 70%"></i><i style="height: 70%"></i><i style="height: 70%"></i>
-            <i style="height: 70%"></i><i style="height: 70%"></i><i style="height: 70%"></i>
-          </div>
-          <div class="faltante">
-            <div>
-              <b>Depende de la misma historia.</b>
-              <p>
-                El reparto por causa ya se calcula —está aquí abajo, en el Pareto—, pero
-                compararlo entre meses necesita más de un mes cerrado. Hoy el periodo
-                cargado ni siquiera completa uno de calendario.
-              </p>
+          <section class="tarjeta sin-datos">
+            <h2>Evolución del mix de causas raíz</h2>
+            <p class="nota">Cómo se reparte el gap mes a mes</p>
+            <div class="fantasma" aria-hidden="true">
+              <i style="height: 70%"></i><i style="height: 70%"></i><i style="height: 70%"></i>
+              <i style="height: 70%"></i><i style="height: 70%"></i><i style="height: 70%"></i>
             </div>
-          </div>
-        </section>
-      </div>
+            <div class="faltante">
+              <div>
+                <b>Depende de la misma historia.</b>
+                <p>
+                  El reparto por causa ya se calcula —está aquí abajo, en el Pareto—, pero
+                  compararlo entre meses necesita más de un mes cerrado. Hoy el periodo
+                  cargado ni siquiera completa uno de calendario.
+                </p>
+              </div>
+            </div>
+          </section>
+        </div>
+      }
 
       <!-- top de SKU por impacto -->
       @if (topSkus().length) {

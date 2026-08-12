@@ -46,6 +46,21 @@ type Modo = 'archivo' | 'tienda';
  */
 const OCULTAR_AVISOS_SIMA = true;
 
+/**
+ * INTERRUPTOR — los dos paneles del boceto que todavía no tienen datos:
+ * "Tendencia de OSA vs. meta" y "Evolución del mix de causas raíz".
+ *
+ * Los dos necesitan seis meses cerrados y hoy hay 43 días cargados
+ * (2026-02-16 a 2026-03-30). Se maquetaron con su aviso de qué falta, pero
+ * por ahora estorban en pantalla.
+ *
+ * En false no se dibujan. El maquetado se queda en el HTML: cuando lleguen
+ * los periodos anteriores, esto vuelve a true y ya está — no hay que
+ * rehacerlo. Ver `diasDeHistoria()` y `rangoHistoria()`, que son los que
+ * arman el aviso.
+ */
+const MOSTRAR_PANELES_SIN_DATOS = false;
+
 /** Colores de la matriz, los mismos del Excel de resultados. Van en las
  *  fichas de las tablas, que llevan el texto de la causa al lado: ahí el
  *  color acompaña y no necesita cargar la identidad. */
@@ -1038,6 +1053,10 @@ export class App {
     const ms = new Date(f.hasta).getTime() - new Date(f.desde).getTime();
     return Math.round(ms / 86_400_000) + 1;
   });
+
+  /** Los paneles de tendencia se dibujan sólo si el interruptor está en true.
+   *  Apagados por ahora: piden seis meses y hay 43 días. */
+  readonly mostrarPanelesSinDatos = MOSTRAR_PANELES_SIN_DATOS;
 
   readonly rangoHistoria = computed(() => {
     const f = this.ventanaBops();
