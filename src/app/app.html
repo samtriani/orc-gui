@@ -961,20 +961,35 @@
               <span><i style="background: var(--linea)"></i>PT pedido tienda · CD CEDIS · PV proveedor</span>
             </div>
 
+            <!-- Tienda y venta comparten escala; CEDIS va en su propia fila
+                 con su propio techo, porque su magnitud es de 10 a 500 veces
+                 mayor y en la misma regla dejaría la venta invisible. Cada
+                 fila dice su máximo para que nadie compare alturas entre
+                 filas creyendo que miden lo mismo. -->
+            <div class="expediente-escala">
+              Existencia en tienda y venta · escala 0–{{ maximoTienda() | number: '1.0-0' }} piezas
+            </div>
+
             <div class="expediente">
               @for (d of ex.dias; track d.fecha) {
                 <div class="expediente-dia">
                   <div class="expediente-barras">
                     <span class="expediente-barra tienda" [title]="'Existencia en tienda: ' + (d.existencia_tienda ?? 'sin dato')">
-                      <i [style.height]="altoBarraDia(d.existencia_tienda, 'existencia_tienda')"></i>
+                      <i [style.height]="altoBarraDia(d.existencia_tienda)"></i>
                     </span>
                     <span class="expediente-barra venta" [title]="'Unidades vendidas: ' + (d.unidades_vendidas ?? 'sin dato')">
-                      <i [style.height]="altoBarraDia(d.unidades_vendidas, 'unidades_vendidas')"></i>
-                    </span>
-                    <span class="expediente-barra cedis" [title]="'Existencia en CEDIS: ' + (d.existencia_cedis ?? 'sin dato')">
-                      <i [style.height]="altoBarraDia(d.existencia_cedis, 'existencia_cedis')"></i>
+                      <i [style.height]="altoBarraDia(d.unidades_vendidas)"></i>
                     </span>
                   </div>
+
+                  @if (hayInventarioCedis()) {
+                    <div class="expediente-barras cedis-fila">
+                      <span class="expediente-barra cedis" [title]="'Existencia en CEDIS: ' + (d.existencia_cedis ?? 'sin dato')">
+                        <i [style.height]="altoBarraDia(d.existencia_cedis, 'cedis')"></i>
+                      </span>
+                    </div>
+                  }
+
                   <div class="expediente-marcas" [title]="'Pedido tienda: ' + (d.pedido_tienda_abierto ? 'abierto' : 'no') + ' · Tránsito: ' + (d.transito_vigente ? 'sí' : 'no') + ' · Orden a proveedor: ' + (d.orden_proveedor_vigente ? 'vigente' : 'no')">
                     <span [class.activa]="d.pedido_tienda_abierto">PT</span>
                     <span [class.activa]="d.transito_vigente || d.envio_generado">CD</span>
@@ -983,18 +998,36 @@
                   <span class="expediente-dia-num">{{ d.fecha | slice: 8 : 10 }}</span>
                   <span
                     class="expediente-causa"
-                    [style.background]="d.root_cause_id ? color(d.root_cause_id) : 'var(--linea)'"
+                    [style.background]="d.root_cause_id ? colorTira(d.root_cause_id) : 'var(--rejilla)'"
                     [title]="d.root_cause_id ? d.root_cause_id + ' · ' + d.causa_raiz : 'Sin faltante'"
                   ></span>
                 </div>
               }
             </div>
+
+            @if (hayInventarioCedis()) {
+              <div class="expediente-escala">
+                Inventario en CEDIS · escala aparte, 0–{{ maximoCedis() | number: '1.0-0' }} piezas
+              </div>
+            }
+
+            <!-- Leyenda de causas: obligatoria, no decorativa. Con seis
+                 causas el color no separa lo suficiente para daltonismo, así
+                 que la identidad tiene que ir escrita. Sólo salen las que
+                 aparecen en este SKU, que suelen ser una o dos. -->
+            @if (causasDelExpediente().length) {
+              <div class="leyenda">
+                @for (c of causasDelExpediente(); track c.id) {
+                  <span><i [style.background]="colorTira(c.id)"></i>{{ c.id }} · {{ c.causa }}</span>
+                }
+                <span><i style="background: var(--rejilla)"></i>Sin faltante</span>
+              </div>
+            }
+
             <p class="nota">
-              <span class="expediente-leyenda tienda"></span> Existencia tienda ·
-              <span class="expediente-leyenda venta"></span> Venta ·
-              <span class="expediente-leyenda cedis"></span> Existencia CEDIS · PT: pedido tienda
-              abierto · CD: envío/tránsito CEDIS vigente · PV: orden a proveedor vigente. El cuadro
-              de abajo es la causa raíz del día (gris = sin faltante).
+              La tira de abajo es la causa raíz de cada día. <b>PT</b>: pedido de tienda abierto ·
+              <b>CD</b>: envío o tránsito de CEDIS vigente · <b>PV</b>: orden a proveedor vigente —
+              en negro cuando aplican ese día, en gris claro cuando no.
             </p>
           }
         </section>

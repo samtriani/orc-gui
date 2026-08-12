@@ -45,7 +45,9 @@ type Modo = 'archivo' | 'tienda';
  */
 const OCULTAR_AVISOS_SIMA = true;
 
-/** Colores de la matriz, los mismos del Excel de resultados. */
+/** Colores de la matriz, los mismos del Excel de resultados. Van en las
+ *  fichas de las tablas, que llevan el texto de la causa al lado: ahí el
+ *  color acompaña y no necesita cargar la identidad. */
 const COLOR_CAUSA: Record<string, string> = {
   RC01: '#DDEBF7',
   RC02: '#FFEB9C',
@@ -54,6 +56,31 @@ const COLOR_CAUSA: Record<string, string> = {
   RC05: '#FFC7CE',
   RC06: '#FFC7CE',
   RC99: '#F2F2F2',
+};
+
+/**
+ * Los mismos códigos, saturados, para la tira de causa raíz del expediente.
+ *
+ * Ahí los pasteles del Excel no sirven: son cuadros de 8 px sobre blanco y
+ * `#F2F2F2` o `#DDEBF7` simplemente no se ven — fue lo primero que se notó al
+ * usarlo. Estos pasan la banda de luminosidad, el piso de croma y el 3:1 de
+ * contraste contra el blanco de la tarjeta.
+ *
+ * Lo que NO pasan es la separación con todos los pares: con el naranja de
+ * marca fijo, ninguna combinación de seis lo hace (se probaron varias; la
+ * mejor deja dos colores a ΔE 13.5 en visión normal, bajo el piso de 15).
+ * Por eso el expediente lleva leyenda obligatoria con las causas que
+ * aparecen en ese SKU, más el tooltip por día: la identidad está escrita y
+ * el color sólo refuerza. Si se quita la leyenda, esto queda mal.
+ */
+const COLOR_CAUSA_TIRA: Record<string, string> = {
+  RC01: '#f0501e',
+  RC02: '#0079c1',
+  RC03: '#7b2d8e',
+  RC04: '#00a199',
+  RC05: '#4e8b2c',
+  RC06: '#c8102e',
+  RC99: '#8a8a95',
 };
 
 @Component({
@@ -779,15 +806,63 @@ export class App {
    *  `escalonMayor` del waterfall: cada barra escala contra el máximo de su
    *  propia lista, no contra un total absoluto, para que un valor chico no
    *  desaparezca. */
-  private maximoDia(campo: 'existencia_tienda' | 'unidades_vendidas' | 'existencia_cedis'): number {
+  // -- escalas de la evolución diaria --------------------------------------
+  //
+  // Antes cada serie se escalaba contra SU PROPIO máximo: tres reglas
+  // distintas en el mismo dibujo, así que comparar alturas no significaba
+  // nada — un inventario de 3 podía verse más alto que una venta de 15.
+  //
+  // Ahora existencia en tienda y venta comparten una sola escala: son el
+  // mismo lugar y la misma unidad (piezas), y compararlas es justo la
+  // pregunta útil ("¿se vendió mientras había stock?").
+  //
+  // CEDIS va aparte, con su propia escala y su máximo escrito, porque su
+  // magnitud no es comparable: medido sobre los datos reales va de 10 a 500
+  // veces el inventario de tienda (un SKU con 4,421 en tienda tiene 105,504
+  // en CEDIS). Metido en la misma regla dejaría la venta en 0.18% de altura,
+  // o sea invisible. Son small multiples, no dos ejes en una gráfica.
+
+  /** Techo compartido de tienda y venta. */
+  readonly maximoTienda = computed(() => {
     const dias = this.expedienteAbierto()?.dias ?? [];
-    return Math.max(...dias.map((d) => d[campo] ?? 0), 0.01);
+    return Math.max(
+      ...dias.map((d) => Math.max(d.existencia_tienda ?? 0, d.unidades_vendidas ?? 0)),
+      0.01,
+    );
+  });
+
+  readonly maximoCedis = computed(() => {
+    const dias = this.expedienteAbierto()?.dias ?? [];
+    return Math.max(...dias.map((d) => d.existencia_cedis ?? 0), 0.01);
+  });
+
+  /** ¿Vale la pena dibujar la fila de CEDIS? Sólo el 11% de los SKU tienen
+   *  inventario de CEDIS cargado; para el resto sería una fila vacía. */
+  readonly hayInventarioCedis = computed(() =>
+    (this.expedienteAbierto()?.dias ?? []).some((d) => d.existencia_cedis !== null),
+  );
+
+  altoBarraDia(valor: number | null, escala: 'tienda' | 'cedis' = 'tienda'): string {
+    if (valor === null) return '0%';
+    const techo = escala === 'cedis' ? this.maximoCedis() : this.maximoTienda();
+    // El mínimo de 2% es para que un valor pequeño pero real no desaparezca.
+    // El cero se dibuja en cero: es un dato, no un valor chico.
+    return valor === 0 ? '0%' : `${Math.max((valor / techo) * 100, 2)}%`;
   }
 
-  altoBarraDia(valor: number | null, campo: 'existencia_tienda' | 'unidades_vendidas' | 'existencia_cedis'): string {
-    if (valor === null) return '0%';
-    return `${Math.max((valor / this.maximoDia(campo)) * 100, 2)}%`;
-  }
+  /** Las causas que de verdad aparecen en ESTE SKU, para la leyenda.
+   *
+   *  La leyenda no es decorativa: con seis causas el color no separa lo
+   *  suficiente —ninguna combinación clarea la prueba de daltonismo con
+   *  todos los pares—, así que la identidad tiene que estar escrita. Sale
+   *  corta porque un SKU rara vez toca más de dos o tres causas. */
+  readonly causasDelExpediente = computed(() => {
+    const vistas = new Map<string, string>();
+    for (const d of this.expedienteAbierto()?.dias ?? []) {
+      if (d.root_cause_id) vistas.set(d.root_cause_id, d.causa_raiz ?? d.root_cause_id);
+    }
+    return [...vistas].map(([id, causa]) => ({ id, causa })).sort((a, b) => a.id.localeCompare(b.id));
+  });
 
   // -- cuánta historia hay cargada ----------------------------------------
   //
@@ -815,6 +890,11 @@ export class App {
 
   color(rc: string): string {
     return COLOR_CAUSA[rc] ?? '#F2F2F2';
+  }
+
+  /** El mismo código, saturado, para la tira del expediente. */
+  colorTira(rc: string): string {
+    return COLOR_CAUSA_TIRA[rc] ?? '#8a8a95';
   }
 
   /** Semáforo del cumplimiento del proveedor: mismos cortes que el Excel. */
