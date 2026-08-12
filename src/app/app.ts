@@ -612,24 +612,66 @@ export class App {
 
   // -- handlers ------------------------------------------------------------
 
+  /**
+   * ¿Este `input` lo escribió el usuario, o lo metió el navegador al elegir
+   * una sugerencia del `<datalist>`?
+   *
+   * Importa porque elegir con el mouse dispara `input`, NUNCA `keydown`: sin
+   * distinguirlo, hacer clic en una sugerencia dejaba el texto en la caja y
+   * no agregaba nada, que es justo lo que uno espera de un autocompletar.
+   *
+   * `insertReplacementText` es la señal estándar y la que manda Chrome. El
+   * segundo caso cubre a los navegadores que no la mandan (y de paso el
+   * pegar): vale sólo si el valor **saltó** más de un carácter, porque
+   * comparar el texto contra la lista a secas se rompe con los proveedores
+   * —"MONDELEZ MEXICO" es una opción y a la vez prefijo de "MONDELEZ MEXICO
+   * S DE R.L. DE C.V."— y auto-agregaría el corto a media palabra.
+   */
+  private vinoDeLaLista(e: Event, previo: string, valor: string, opciones: string[]): boolean {
+    if ((e as InputEvent).inputType === 'insertReplacementText') return true;
+    if (valor.length - previo.length <= 1) return false;
+    return opciones.some((o) => normalizar(o) === normalizar(valor));
+  }
+
   /** Sólo captura lo que se va escribiendo — no filtra todavía. El
    *  `<datalist>` sugiere de `opcionesSku()` mientras tanto. */
   ponEntradaSku(e: Event): void {
-    this.entradaSku.set((e.target as HTMLInputElement).value);
+    const previo = this.entradaSku();
+    const valor = (e.target as HTMLInputElement).value;
+    this.entradaSku.set(valor);
+    if (this.vinoDeLaLista(e, previo, valor, this.opcionesSku().map((o) => o.etiqueta))) {
+      this.confirmarSku();
+    }
   }
 
   ponEntradaProveedor(e: Event): void {
-    this.entradaProveedor.set((e.target as HTMLInputElement).value);
+    const previo = this.entradaProveedor();
+    const valor = (e.target as HTMLInputElement).value;
+    this.entradaProveedor.set(valor);
+    if (this.vinoDeLaLista(e, previo, valor, this.proveedoresDisponibles())) {
+      this.confirmarProveedor();
+    }
   }
 
-  /** Enter (o elegir una sugerencia y darle Enter) agrega la ficha. Si el
-   *  texto es la etiqueta completa de una sugerencia ("código — nombre"),
-   *  se queda sólo con el código — la ficha no necesita cargar el nombre.
-   *  Cualquier otro texto se agrega tal cual, igual que antes: no hace
-   *  falta que exista en este periodo para poder buscarlo. */
+  /** Enter agrega la ficha. Elegir del `<datalist>` la agrega sola, sin
+   *  pedir Enter. */
   agregarSku(e: KeyboardEvent): void {
     if (e.key !== 'Enter') return;
     e.preventDefault();
+    this.confirmarSku();
+  }
+
+  agregarProveedor(e: KeyboardEvent): void {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    this.confirmarProveedor();
+  }
+
+  /** Si el texto es la etiqueta completa de una sugerencia ("código —
+   *  nombre"), la ficha se queda sólo con el código: no necesita cargar el
+   *  nombre. Cualquier otro texto se agrega tal cual — no hace falta que
+   *  exista en este periodo para poder buscarlo. */
+  private confirmarSku(): void {
     const escrito = this.entradaSku().trim();
     if (!escrito) return;
     const opcion = this.opcionesSku().find((o) => normalizar(o.etiqueta) === normalizar(escrito));
@@ -641,9 +683,7 @@ export class App {
     this.entradaSku.set('');
   }
 
-  agregarProveedor(e: KeyboardEvent): void {
-    if (e.key !== 'Enter') return;
-    e.preventDefault();
+  private confirmarProveedor(): void {
     const valor = this.entradaProveedor().trim();
     if (!valor) return;
     if (!this.filtroProveedor().some((p) => normalizar(p) === normalizar(valor))) {
