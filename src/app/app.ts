@@ -600,7 +600,12 @@ export class App {
     const skus = this.filtroSku();
     const provs = this.filtroProveedor();
     return (this.resultado()?.citas_falladas ?? []).filter(
-      (c) => this.coincideAlguna([c.sku], skus) && this.coincideAlguna([c.proveedor], provs),
+      // La descripción se resuelve por código: las citas no la traen, y sin
+      // esto buscar por nombre vaciaba esta tabla mientras el resto de la
+      // pantalla sí respondía.
+      (c) =>
+        this.coincideAlguna([c.sku, this.descripcionDe(c.sku)], skus) &&
+        this.coincideAlguna([c.proveedor], provs),
     );
   });
 
