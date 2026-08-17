@@ -649,7 +649,10 @@
       <!-- pareto -->
       <div class="dos">
         <section class="tarjeta">
-          <h2>Pareto por causa raíz</h2>
+          <!-- Decir por qué reparte: el waterfall de arriba reparte puntos de
+               OSA sobre los mismos días y da otro orden. Sin la aclaración, dos
+               listas de causas en la misma pantalla parecen contradecirse. -->
+          <h2>Pareto de causa raíz por venta perdida</h2>
           <table>
             <thead>
               <tr>
@@ -670,8 +673,10 @@
                   </td>
                   <td class="num">${{ c.venta_perdida | number: '1.2-2' }}</td>
                   <td class="num">
-                    <div class="barra-pct"><span [style.width.%]="c.pct"></span></div>
-                    {{ c.pct }}%
+                    <span class="pct-celda">
+                      <span class="barra-pct"><span [style.width.%]="c.pct"></span></span>
+                      <span class="pct-val">{{ c.pct | number: '1.1-1' }}%</span>
+                    </span>
                   </td>
                   <td>{{ c.responsable }}</td>
                 </tr>
@@ -682,7 +687,7 @@
         </section>
 
         <section class="tarjeta">
-          <h2>Pareto por responsable</h2>
+          <h2>Pareto de responsable por venta perdida</h2>
           <table>
             <thead>
               <tr>
@@ -697,8 +702,10 @@
                   <td>{{ x.responsable }}</td>
                   <td class="num">${{ x.venta_perdida | number: '1.2-2' }}</td>
                   <td class="num">
-                    <div class="barra-pct"><span [style.width.%]="x.pct"></span></div>
-                    {{ x.pct }}%
+                    <span class="pct-celda">
+                      <span class="barra-pct"><span [style.width.%]="x.pct"></span></span>
+                      <span class="pct-val">{{ x.pct | number: '1.1-1' }}%</span>
+                    </span>
                   </td>
                 </tr>
               }
