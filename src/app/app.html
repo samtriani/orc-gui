@@ -314,9 +314,23 @@
           <span class="pie">con al menos un día de faltante</span>
         </div>
         <div class="cifra">
-          <span class="etiqueta">Días SKU con gap</span>
-          <strong>{{ r.cobertura!.casos_en_alcance | number }}</strong>
-          <span class="pie">{{ r.cobertura!.cobertura_casos_alcance_pct }}% explicados</span>
+          <span class="etiqueta">Promedio de días con gap por SKU</span>
+          <!-- El conteo crudo son decenas de miles de días y no hay contra
+               qué compararlo. Si falta el detalle para calcular el promedio,
+               se cae al conteo en vez de dejar la tarjeta en blanco. -->
+          @if (promedioDiasConGapPorSku(); as prom) {
+            <strong>{{ prom | number: '1.1-1' }}</strong>
+            <span class="pie">
+              de {{ diasDelPeriodo() }} días del periodo · promedia todos los SKU
+              del alcance, incluidos los que nunca faltaron
+            </span>
+          } @else {
+            <strong>{{ r.cobertura!.casos_en_alcance | number }}</strong>
+            <span class="pie">
+              días-SKU con faltante · {{ r.cobertura!.cobertura_casos_alcance_pct }}%
+              explicados
+            </span>
+          }
         </div>
         <div class="cifra">
           <span class="etiqueta">Venta perdida</span>

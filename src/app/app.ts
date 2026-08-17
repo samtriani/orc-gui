@@ -1058,6 +1058,32 @@ export class App {
    *  Apagados por ahora: piden seis meses y hay 43 días. */
   readonly mostrarPanelesSinDatos = MOSTRAR_PANELES_SIN_DATOS;
 
+  /** Cuántos días con hueco tuvo un SKU en promedio durante el periodo.
+   *
+   *  El conteo crudo —43,821 días— no le dice nada a nadie: no hay con qué
+   *  compararlo de memoria. "12 días de 31" sí se entiende solo.
+   *
+   *  OJO CON EL DENOMINADOR: son TODOS los SKU del alcance, no sólo los que
+   *  tuvieron hueco. Un SKU que estuvo disponible todo el mes cuenta como
+   *  cero días y baja el promedio — que es justo lo que se quiere medir. Si
+   *  se dividiera sólo entre los que fallaron, el número diría "qué tan malo
+   *  fue el que falló", no "cómo estuvo el surtido".
+   *
+   *  Sale de `detalle_dias.universo`, que trae una entrada por SKU-tienda
+   *  medido, con o sin faltante. No hace falta tocar el backend.
+   */
+  readonly promedioDiasConGapPorSku = computed(() => {
+    const r = this.resultado();
+    const det = r?.detalle_dias;
+    if (!det?.universo?.length) return null;
+    const skus = new Set(det.universo.map((u) => u.s)).size;
+    return skus ? (r?.cobertura?.casos_en_alcance ?? 0) / skus : null;
+  });
+
+  /** Los días que cubre el periodo, para leer el promedio contra su techo:
+   *  12 de 31 dice mucho más que 12 a secas. */
+  readonly diasDelPeriodo = computed(() => this.diasDeHistoria());
+
   /** Qué tienda(s) cubre el resultado, con nombre.
    *
    *  Sale de `por_sku_tienda` y no del formulario: el formulario puede
