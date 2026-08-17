@@ -597,9 +597,25 @@
           <div class="agua">
             @for (s of topSkus(); track s.sku + s.tienda) {
               <div class="agua-fila clicable" (click)="verSku(s.sku)" title="Filtrar por este SKU">
-                <span class="agua-eti">
-                  {{ s.sku }}
-                  <small>tienda {{ s.tienda }} · {{ s.dias_con_faltante | number }} días</small>
+                <!-- El nombre manda: es lo que una persona reconoce. El código
+                     baja al renglón chico, que es donde se usa: para copiarlo al
+                     filtro o buscarlo en otro sistema. Si el catálogo no trae
+                     descripción, el código sube y ocupa su lugar. -->
+                <span class="agua-eti" [title]="s.descripcion || s.sku">
+                  {{ s.descripcion || s.sku }}
+                  <!-- La tienda no se repite aquí: ya va en el encabezado del
+                       resultado. Sólo reaparece si el análisis llegara a cubrir
+                       más de una, que es cuando el renglón sí necesita decir
+                       de cuál es. -->
+                  <small>
+                    @if (s.descripcion) {
+                      {{ s.sku }} ·
+                    }
+                    @if (tiendasAnalizadas().length > 1) {
+                      tienda {{ s.tienda }} ·
+                    }
+                    {{ s.dias_con_faltante | number }} días
+                  </small>
                 </span>
                 <span class="agua-barra">
                   <i [style.width]="anchoSku(s.venta_perdida)" [style.background]="color(s.root_cause_id)"></i>
