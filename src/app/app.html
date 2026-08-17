@@ -468,7 +468,7 @@
               <span><b>{{ f.diasClasificados | number }}</b> explicados</span>
               <span><b>${{ f.ventaPerdida | number: '1.0-0' }}</b> de venta perdida</span>
               @if (f.citas) {
-                <span><b>{{ f.citas }}</b> citas falladas</span>
+                <span><b>{{ f.citas | number }}</b> citas falladas</span>
               }
             </div>
             <div class="ficha-causas">
@@ -599,7 +599,7 @@
               <div class="agua-fila clicable" (click)="verSku(s.sku)" title="Filtrar por este SKU">
                 <span class="agua-eti">
                   {{ s.sku }}
-                  <small>tienda {{ s.tienda }} · {{ s.dias_con_faltante }} días</small>
+                  <small>tienda {{ s.tienda }} · {{ s.dias_con_faltante | number }} días</small>
                 </span>
                 <span class="agua-barra">
                   <i [style.width]="anchoSku(s.venta_perdida)" [style.background]="color(s.root_cause_id)"></i>
@@ -638,7 +638,6 @@
             <thead>
               <tr>
                 <th>Causa</th>
-                <th class="num">Días</th>
                 <th class="num">Venta perdida</th>
                 <th class="num">%</th>
                 <th>Responsable</th>
@@ -653,7 +652,6 @@
                     }}</span>
                     {{ c.causa }}
                   </td>
-                  <td class="num">{{ c.dias }}</td>
                   <td class="num">${{ c.venta_perdida | number: '1.2-2' }}</td>
                   <td class="num">
                     <div class="barra-pct"><span [style.width.%]="c.pct"></span></div>
@@ -673,7 +671,6 @@
             <thead>
               <tr>
                 <th>Responsable</th>
-                <th class="num">Días</th>
                 <th class="num">Venta perdida</th>
                 <th class="num">%</th>
               </tr>
@@ -682,7 +679,6 @@
               @for (x of pgResponsables.items(); track x.responsable) {
                 <tr>
                   <td>{{ x.responsable }}</td>
-                  <td class="num">{{ x.dias }}</td>
                   <td class="num">${{ x.venta_perdida | number: '1.2-2' }}</td>
                   <td class="num">
                     <div class="barra-pct"><span [style.width.%]="x.pct"></span></div>
@@ -724,21 +720,21 @@
               @for (p of pgProveedores.items(); track p.proveedor_id) {
                 <tr>
                   <td>{{ p.nombre || p.proveedor_id }}</td>
-                  <td class="num">{{ p.pedidos }}</td>
-                  <td class="num">{{ p.cajas_pedidas }}</td>
+                  <td class="num">{{ p.pedidos | number }}</td>
+                  <td class="num">{{ p.cajas_pedidas | number }}</td>
                   <td class="num" [class]="semaforo(p.pct_surtido_pedido)">
                     {{ p.pct_surtido_pedido | percent: '1.1-1' }}
                   </td>
-                  <td class="num">{{ p.citas }}</td>
+                  <td class="num">{{ p.citas | number }}</td>
                   <td class="num" [class.medio]="p.pedidos_sin_cita > 0">
-                    {{ p.pedidos_sin_cita }}
+                    {{ p.pedidos_sin_cita | number }}
                   </td>
                   <td class="num">{{ p.pct_confirmado | percent: '1.1-1' }}</td>
                   <td class="num">{{ p.pct_cumplimiento | percent: '1.1-1' }}</td>
                   <td class="num" [class]="semaforo(p.pct_efectivo)">
                     {{ p.pct_efectivo | percent: '1.1-1' }}
                   </td>
-                  <td class="num">{{ p.citas_incumplidas }}</td>
+                  <td class="num">{{ p.citas_incumplidas | number }}</td>
                 </tr>
               }
               @if (!pgProveedores.total()) {
@@ -764,7 +760,7 @@
                 @for (s of pgSubcausas.items(); track s.subcausa) {
                   <tr>
                     <td>{{ s.subcausa }}</td>
-                    <td class="num">{{ s.dias }}</td>
+                    <td class="num">{{ s.dias | number }}</td>
                     <td class="num">${{ s.venta_perdida | number: '1.2-2' }}</td>
                   </tr>
                 }
@@ -796,7 +792,7 @@
               @for (b of pgBloqueos.items(); track b.campo) {
                 <tr>
                   <td><code>{{ b.campo }}</code></td>
-                  <td class="num">{{ b.dias }}</td>
+                  <td class="num">{{ b.dias | number }}</td>
                   <td class="num">${{ b.venta_perdida | number: '1.2-2' }}</td>
                   <td>{{ b.a_quien }}</td>
                 </tr>
@@ -848,7 +844,7 @@
                     }}</code>
                   </td>
                   <td>{{ s.tienda }}</td>
-                  <td class="num">{{ s.dias_clasificados }}/{{ s.dias_con_faltante }}</td>
+                  <td class="num">{{ s.dias_clasificados | number }}/{{ s.dias_con_faltante | number }}</td>
                   <td class="num" [class.medio]="s.cobertura_pct < 100">{{ s.cobertura_pct }}%</td>
                   <td class="num">${{ s.venta_perdida | number: '1.2-2' }}</td>
                   <td class="num">{{ s.osa_promedio }}</td>
@@ -908,9 +904,9 @@
                     <td><code>{{ c.folio }}</code></td>
                     <td><code>{{ c.folio_cita }}</code></td>
                     <td>{{ c.fecha_cita }}</td>
-                    <td class="num">{{ c.confirmadas }}</td>
-                    <td class="num">{{ c.entregadas }}</td>
-                    <td class="num mal">{{ c.faltantes }}</td>
+                    <td class="num">{{ c.confirmadas | number }}</td>
+                    <td class="num">{{ c.entregadas | number }}</td>
+                    <td class="num mal">{{ c.faltantes | number }}</td>
                   </tr>
                 }
                 @if (!pgCitas.total()) {
