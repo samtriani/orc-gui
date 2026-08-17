@@ -1032,3 +1032,27 @@ a.descarga::before { background: var(--acento) !important; }
   background: #dff0d6;
   box-shadow: inset 0 0 0 1px #86b97e, 0 0 0 1px #fff;
 }
+
+/* ---- de qué tienda y qué periodo es este resultado ---- */
+/* Va antes de las cifras y con el peso de un título: con varias tiendas
+   cargadas, ver "85.9%" sin saber de cuál es se presta a confusión. */
+.alcance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+  padding-left: 12px;
+  border-left: 4px solid var(--acento);
+}
+.alcance-tienda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 600;
+}
+.alcance-periodo {
+  font-size: 13px;
+  color: var(--tinta-suave);
+  font-variant-numeric: tabular-nums;
+}

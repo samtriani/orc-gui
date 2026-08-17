@@ -279,7 +279,23 @@
 
       <!-- ===================== PORTADA EJECUTIVA =====================
            El resultado y, enseguida, la brecha explicada por causa. El
-           detalle viene después: general primero, particular al final. -->
+           detalle viene después: general primero, particular al final.
+
+           Encabeza con QUÉ se analizó. Con varias tiendas cargadas, una
+           pantalla de resultados sin decir cuál es se malinterpreta sola. -->
+      @if (tiendasAnalizadas().length) {
+        <div class="alcance">
+          <span class="alcance-tienda">
+            @for (t of tiendasAnalizadas(); track t) {
+              <b>{{ t }}</b>
+            }
+          </span>
+          @if (rangoHistoria(); as p) {
+            <span class="alcance-periodo">{{ p }}</span>
+          }
+        </div>
+      }
+
       <section class="cifras">
         <div class="cifra">
           <span class="etiqueta">OSA del periodo</span>

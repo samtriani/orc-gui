@@ -1058,6 +1058,18 @@ export class App {
    *  Apagados por ahora: piden seis meses y hay 43 días. */
   readonly mostrarPanelesSinDatos = MOSTRAR_PANELES_SIN_DATOS;
 
+  /** Qué tienda(s) cubre el resultado, con nombre.
+   *
+   *  Sale de `por_sku_tienda` y no del formulario: el formulario puede
+   *  cambiar después de correr el análisis, y lo que hay que encabezar es lo
+   *  que se analizó, no lo que está seleccionado ahora. Con varias tiendas
+   *  cargadas, la clave sola no basta para saber cuál se está viendo. */
+  readonly tiendasAnalizadas = computed(() =>
+    [...new Set((this.resultado()?.por_sku_tienda ?? []).map((s) => s.tienda))]
+      .sort()
+      .map((id) => this.etiquetaTienda(id)),
+  );
+
   readonly rangoHistoria = computed(() => {
     const f = this.ventanaBops();
     return f?.desde && f?.hasta ? `${f.desde} a ${f.hasta}` : null;
