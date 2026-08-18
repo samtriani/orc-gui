@@ -327,8 +327,8 @@
           } @else {
             <strong>{{ r.cobertura!.casos_en_alcance | number }}</strong>
             <span class="pie">
-              días-SKU con faltante · {{ r.cobertura!.cobertura_casos_alcance_pct }}%
-              explicados
+              Impactos (SKU × días con faltante) ·
+              {{ r.cobertura!.cobertura_casos_alcance_pct }}% explicados
             </span>
           }
         </div>
@@ -344,6 +344,19 @@
             <span class="etiqueta">Fill rate proveedor</span>
             <strong>{{ fr }}%</strong>
             <span class="pie">cajas entregadas sobre pedidas con cita</span>
+          </div>
+        }
+        <!-- La otra pata de la cadena: arriba proveedor→CEDIS, aquí CEDIS→tienda.
+             Sólo aparece cuando SIMA trae pedidos; sin la hoja no se inventa un
+             0%, que se leería como "no surtieron nada". -->
+        @if (r.nivel_servicio_tienda?.nivel_servicio_pct; as ns) {
+          <div class="cifra">
+            <span class="etiqueta">Nivel de servicio a tienda</span>
+            <strong>{{ ns }}%</strong>
+            <span class="pie">
+              piezas surtidas sobre pedidas ·
+              {{ r.nivel_servicio_tienda!.pedidos | number }} pedidos
+            </span>
           </div>
         }
         <a class="cifra descarga" [href]="urlDescarga()" download>
@@ -501,10 +514,13 @@
       <!-- waterfall: de 100% al OSA real, en puntos -->
       @if (waterfallFiltrado(); as wf) {
         <section class="tarjeta">
-          <h2>Causas raíz de faltantes</h2>
+          <!-- "por Volumen" en el título, no sólo en la nota: es lo único que
+               distingue esta distribución de la de venta perdida, y las dos
+               reparten las mismas causas con otro orden. -->
+          <h2>Causa Raíz por Volumen</h2>
           <p class="nota">
             Cuántos puntos de OSA recuperaría cada causa si se resolviera por completo. No es el
-            Pareto de pesos: aquí un día con faltante pesa igual que cualquier otro, valga lo que
+            reparto de pesos: aquí un día con faltante pesa igual que cualquier otro, valga lo que
             valga.
           </p>
 
@@ -594,6 +610,14 @@
       @if (topSkus().length) {
         <section class="tarjeta">
           <h2>SKU que más costaron</h2>
+          <!-- El encabezado dice qué son los montos de la derecha: sin él, la
+               cifra en pesos se puede leer como venta, no como lo que se dejó
+               de vender. La causa raíz sigue debajo de cada monto. -->
+          <div class="agua-encabezado">
+            <span class="agua-eti">Producto</span>
+            <span class="agua-barra"></span>
+            <span class="agua-val">Venta perdida</span>
+          </div>
           <div class="agua">
             @for (s of topSkus(); track s.sku + s.tienda) {
               <div class="agua-fila clicable" (click)="verSku(s.sku)" title="Filtrar por este SKU">
@@ -614,11 +638,56 @@
                     @if (tiendasAnalizadas().length > 1) {
                       tienda {{ s.tienda }} ·
                     }
-                    {{ s.dias_con_faltante | number }} días
+                    {{ s.dias_con_faltante | number }} días con gap
                   </small>
                 </span>
                 <span class="agua-barra">
                   <i [style.width]="anchoSku(s.venta_perdida)" [style.background]="color(s.root_cause_id)"></i>
+                </span>
+                <span class="agua-val">
+                  ${{ s.venta_perdida | number: '1.0-0' }}
+                  <small>{{ s.causa }}</small>
+                </span>
+              </div>
+            }
+          </div>
+        </section>
+      }
+
+      <!-- bottom de SKU por impacto -->
+      @if (bottomSkus().length) {
+        <section class="tarjeta">
+          <h2>SKU que menos costaron</h2>
+          <!-- Los 10 de menor venta perdida ENTRE LOS QUE SÍ TUVIERON GAP: un
+               SKU que nunca faltó no aparece en la lista, porque no tiene
+               nada que explicar. La barra se escala contra este grupo, no
+               contra el top, o todas saldrían invisibles. -->
+          <p class="nota">
+            Los de menor impacto entre los que tuvieron al menos un día con gap.
+          </p>
+          <div class="agua-encabezado">
+            <span class="agua-eti">Producto</span>
+            <span class="agua-barra"></span>
+            <span class="agua-val">Venta perdida</span>
+          </div>
+          <div class="agua">
+            @for (s of bottomSkus(); track s.sku + s.tienda) {
+              <div class="agua-fila clicable" (click)="verSku(s.sku)" title="Filtrar por este SKU">
+                <span class="agua-eti" [title]="s.descripcion || s.sku">
+                  {{ s.descripcion || s.sku }}
+                  <small>
+                    @if (s.descripcion) {
+                      {{ s.sku }} ·
+                    }
+                    @if (tiendasAnalizadas().length > 1) {
+                      tienda {{ s.tienda }} ·
+                    }
+                    {{ s.dias_con_faltante | number }} días con gap
+                  </small>
+                </span>
+                <span class="agua-barra">
+                  <i [style.width]="anchoSkuBajo(s.venta_perdida)"
+                     [style.background]="color(s.root_cause_id)"></i>
                 </span>
                 <span class="agua-val">
                   ${{ s.venta_perdida | number: '1.0-0' }}
@@ -652,7 +721,7 @@
           <!-- Decir por qué reparte: el waterfall de arriba reparte puntos de
                OSA sobre los mismos días y da otro orden. Sin la aclaración, dos
                listas de causas en la misma pantalla parecen contradecirse. -->
-          <h2>Pareto de causa raíz por venta perdida</h2>
+          <h2>Causa Raíz por Venta Perdida</h2>
           <table>
             <thead>
               <tr>
@@ -687,7 +756,7 @@
         </section>
 
         <section class="tarjeta">
-          <h2>Pareto de responsable por venta perdida</h2>
+          <h2>Causa Raíz por Área Responsable</h2>
           <table>
             <thead>
               <tr>
@@ -775,7 +844,7 @@
               <thead>
                 <tr>
                   <th>Detalle / subcausa</th>
-                  <th class="num">Días</th>
+                  <th class="num">Impactos (SKU × días con faltante)</th>
                   <th class="num">Venta perdida</th>
                 </tr>
               </thead>
@@ -846,11 +915,19 @@
             <thead>
               <tr>
                 <th>SKU</th>
-                <th>Tienda</th>
-                <th class="num">Días</th>
+                <!-- La tienda sólo cuando hay más de una: con un análisis por
+                     tienda la columna repite el mismo valor en cada renglón. -->
+                @if (tiendasAnalizadas().length > 1) {
+                  <th>Tienda</th>
+                }
+                <th class="num" title="Días con gap explicados / días con gap">
+                  Días con gap
+                </th>
                 <th class="num">Cobertura</th>
                 <th class="num">Venta perdida</th>
-                <th class="num">OSA prom.</th>
+                <th class="num" title="Días visibles sobre días con lectura de OSA en el periodo">
+                  OSA del periodo
+                </th>
                 <th>Causa dominante</th>
                 <th>Responsable</th>
                 @if (modo() === 'tienda') {
@@ -861,16 +938,34 @@
             <tbody>
               @for (s of pgSkus.items(); track s.sku + s.tienda) {
                 <tr>
+                  <!-- El nombre manda, igual que en "SKU que más costaron"; el
+                       código baja al renglón chico y sigue siendo el clicable. -->
                   <td>
-                    <code class="clicable" (click)="verSku(s.sku)" title="Filtrar por este SKU">{{
-                      s.sku
-                    }}</code>
+                    <span class="celda-sku" [title]="s.descripcion || s.sku">
+                      {{ s.descripcion || s.sku }}
+                      @if (s.descripcion) {
+                        <small>
+                          <code class="clicable" (click)="verSku(s.sku)"
+                                title="Filtrar por este SKU">{{ s.sku }}</code>
+                        </small>
+                      }
+                    </span>
                   </td>
-                  <td>{{ s.tienda }}</td>
+                  @if (tiendasAnalizadas().length > 1) {
+                    <td>{{ s.tienda }}</td>
+                  }
                   <td class="num">{{ s.dias_clasificados | number }}/{{ s.dias_con_faltante | number }}</td>
                   <td class="num" [class.medio]="s.cobertura_pct < 100">{{ s.cobertura_pct }}%</td>
                   <td class="num">${{ s.venta_perdida | number: '1.2-2' }}</td>
-                  <td class="num">{{ s.osa_promedio }}</td>
+                  <!-- osa_periodo, NO osa_promedio: ese último daba 0 en todos
+                       los renglones porque promedia sólo los días con gap. -->
+                  <td class="num" [title]="(s.dias_evaluados || 0) + ' días evaluados'">
+                    @if (s.osa_periodo !== null) {
+                      {{ s.osa_periodo | number: '1.1-1' }}%
+                    } @else {
+                      —
+                    }
+                  </td>
                   <td>
                     <span class="chip" [style.background]="color(s.root_cause_id)">{{
                       s.root_cause_id
@@ -889,7 +984,7 @@
               }
               @if (!pgSkus.total()) {
                 <tr>
-                  <td [attr.colspan]="modo() === 'tienda' ? 9 : 8" class="vacio">
+                  <td [attr.colspan]="columnasDetalle()" class="vacio">
                     Ningún SKU coincide con el filtro.
                   </td>
                 </tr>
@@ -958,7 +1053,7 @@
               @for (f of r.fuentes; track f.hoja) {
                 <tr [class.fila-mal]="fuenteEnRojo(f.hoja, f.filas)">
                   <td><code>{{ f.hoja }}</code></td>
-                  <td class="num">{{ f.filas }}</td>
+                  <td class="num">{{ f.filas | number }}</td>
                   <td>{{ f.desde }}</td>
                   <td>{{ f.hasta }}</td>
                   <td>{{ f.equipo }}</td>

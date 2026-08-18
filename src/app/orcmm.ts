@@ -125,14 +125,35 @@ export interface FilaSkuTienda {
   dias_clasificados: number;
   cobertura_pct: number;
   venta_perdida: number;
+  /**
+   * NO usar: promedia el OSA sólo de los días con faltante, que valen 0 por
+   * definición (BOPS reporta OSA binario). Da 0 en todos los renglones. Se
+   * conserva porque el backend lo sigue mandando; el bueno es osa_periodo.
+   */
   osa_promedio: number | null;
+  /** Días del periodo con lectura de OSA para este SKU — el denominador. */
+  dias_evaluados: number | null;
+  /** OSA del SKU en TODO el periodo: días visibles / días evaluados. */
+  osa_periodo: number | null;
   root_cause_id: string;
   causa: string;
   responsable: string;
 }
 
+/** Nivel de servicio de CEDIS a tienda, en PIEZAS (SIMA no entrega cajas). */
+export interface NivelServicioTienda {
+  pedidos: number;
+  piezas_pedidas: number;
+  piezas_surtidas: number;
+  pedidos_completos: number;
+  pedidos_sin_surtir: number;
+  nivel_servicio_pct: number | null;
+}
+
 export interface FilaProveedor {
   proveedor_id: string;
+  /** Todos los IDs consolidados en este renglón (Nestlé venía con dos). */
+  ids: string[];
   nombre: string;
   pedidos: number;
   cajas_pedidas: number;
@@ -227,6 +248,7 @@ export interface Analisis {
   umbral_osa?: number;
   waterfall?: Waterfall;
   fill_rate_proveedor?: FillRate;
+  nivel_servicio_tienda?: NivelServicioTienda;
   cobertura?: Cobertura;
   por_causa?: FilaCausa[];
   por_responsable?: FilaResponsable[];

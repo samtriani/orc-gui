@@ -412,6 +412,33 @@ tr.fila-mal td {
   padding: 7px 0;
 }
 
+/* Encabezado de las listas de SKU: mismas columnas que .agua-fila para que
+   "Venta perdida" caiga justo encima de los montos. Sin él, la cifra en pesos
+   se puede leer como venta y no como lo que se dejó de vender. */
+.agua-encabezado {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) 1fr minmax(120px, auto);
+  gap: 14px;
+  margin-top: 14px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--linea);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--tinta-suave);
+}
+
+.agua-encabezado .agua-val {
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+/* El encabezado ya abre el espacio: la lista que le sigue no lo repite. */
+.agua-encabezado + .agua {
+  margin-top: 0;
+}
+
 .agua-eti {
   font-size: 13px;
   overflow: hidden;
@@ -1074,4 +1101,22 @@ a.descarga::before { background: var(--acento) !important; }
 .pct-val {
   min-width: 3.6em;
   text-align: right;
+}
+
+/* Celda de SKU en la tabla de detalle: el nombre manda y el código baja al
+   renglón chico, igual que en "SKU que más costaron". El código sigue siendo
+   el clicable — es lo que se copia al filtro o se busca en otro sistema. */
+.celda-sku {
+  display: block;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.celda-sku small {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--tinta-suave);
 }

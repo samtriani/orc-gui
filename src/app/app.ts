@@ -472,6 +472,36 @@ export class App {
     return `${Math.max((venta / this.ventaMayor()) * 100, 2)}%`;
   }
 
+  /** Los 10 de MENOR venta perdida, entre los que sí tuvieron gap.
+   *
+   *  La lista viene ordenada de mayor a menor, así que la cola son los de
+   *  menor impacto; se invierte para que se lea de menor a mayor. No incluye
+   *  los SKU que nunca faltaron: ésos no están en `por_sku_tienda` porque no
+   *  tienen nada que explicar, y meterlos sería una lista de ceros.
+   *
+   *  Si hay 10 o menos en total, top y bottom serían la misma lista, así que
+   *  no se muestra: repetir la misma tabla dos veces sólo confunde. */
+  readonly bottomSkus = computed(() => {
+    const todos = this.skusFiltrados();
+    if (todos.length <= 10) return [];
+    return todos.slice(-10).reverse();
+  });
+
+  /** Escala propia del bottom: contra el máximo del top, estas barras darían
+   *  todas cero ancho — el SKU más caro cuesta órdenes de magnitud más. */
+  private readonly ventaMayorBaja = computed(() =>
+    Math.max(...this.bottomSkus().map((s) => s.venta_perdida), 1),
+  );
+
+  anchoSkuBajo(venta: number): string {
+    return `${Math.max((venta / this.ventaMayorBaja()) * 100, 2)}%`;
+  }
+
+  /** Columnas de la tabla de detalle — la tienda y el botón son opcionales. */
+  readonly columnasDetalle = computed(
+    () => 7 + (this.tiendasAnalizadas().length > 1 ? 1 : 0) + (this.modo() === 'tienda' ? 1 : 0),
+  );
+
   // ========================================================================
   // FILTROS
   // ========================================================================
