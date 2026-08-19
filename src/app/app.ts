@@ -644,11 +644,29 @@ export class App {
   /** El scorecard de proveedor es un agregado del periodo: no tiene columna de
    *  SKU, así que el filtro de SKU no puede tocarlo sin mentir. Se filtra sólo
    *  por nombre. Para ver el proveedor de un SKU está la tabla de citas. */
+  /** Proveedores ordenados por nivel de servicio, PEOR PRIMERO.
+   *
+   *  Así la primera página —que son 10— es el Bottom 10 que se pidió, sin
+   *  duplicar la tabla en una sección aparte: el que quiera ver el resto
+   *  sigue paginando, y el filtro por proveedor sigue funcionando igual.
+   *
+   *  Los que no tienen nivel de servicio (ningún pedido en el periodo) van
+   *  al final: sin denominador no son "los peores", son "no se sabe", y
+   *  encabezar el ranking con ellos taparía a los que sí fallaron. */
   readonly proveedoresFiltrados = computed<FilaProveedor[]>(() => {
     const provs = this.filtroProveedor();
-    return (this.resultado()?.proveedores ?? []).filter((p) =>
-      this.coincideAlguna([p.nombre, p.proveedor_id], provs),
-    );
+    return (this.resultado()?.proveedores ?? [])
+      .filter((p) => this.coincideAlguna([p.nombre, p.proveedor_id], provs))
+      .slice()
+      .sort((a, b) => {
+        const x = a.nivel_servicio, y = b.nivel_servicio;
+        if (x === null && y === null) return b.cajas_pedidas - a.cajas_pedidas;
+        if (x === null) return 1;
+        if (y === null) return -1;
+        // A igual nivel de servicio manda el volumen: fallarle a 10 mil cajas
+        // pesa más que fallarle a diez.
+        return x - y || b.cajas_pedidas - a.cajas_pedidas;
+      });
   });
 
   // ========================================================================

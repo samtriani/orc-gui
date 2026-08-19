@@ -314,23 +314,19 @@
           <span class="pie">con al menos un día de faltante</span>
         </div>
         <div class="cifra">
-          <span class="etiqueta">Promedio de días con gap por SKU</span>
-          <!-- El conteo crudo son decenas de miles de días y no hay contra
-               qué compararlo. Si falta el detalle para calcular el promedio,
-               se cae al conteo en vez de dejar la tarjeta en blanco. -->
-          @if (promedioDiasConGapPorSku(); as prom) {
-            <strong>{{ prom | number: '1.1-1' }}</strong>
-            <span class="pie">
-              de {{ diasDelPeriodo() }} días del periodo · promedia todos los SKU
-              del alcance, incluidos los que nunca faltaron
-            </span>
-          } @else {
-            <strong>{{ r.cobertura!.casos_en_alcance | number }}</strong>
-            <span class="pie">
-              Impactos (SKU × días con faltante) ·
-              {{ r.cobertura!.cobertura_casos_alcance_pct }}% explicados
-            </span>
-          }
+          <span class="etiqueta">Impactos (SKU × días con faltante)</span>
+          <strong>{{ r.cobertura!.casos_en_alcance | number }}</strong>
+          <!-- El conteo crudo son decenas de miles y no hay contra qué
+               compararlo, así que el promedio de días con gap por SKU lo
+               acompaña abajo: es la escala que lo vuelve legible. Si falta el
+               detalle para calcularlo, queda la cobertura sola. -->
+          <span class="pie">
+            @if (promedioDiasConGapPorSku(); as prom) {
+              {{ prom | number: '1.1-1' }} días con gap por SKU en promedio, de
+              {{ diasDelPeriodo() }} del periodo ·
+            }
+            {{ r.cobertura!.cobertura_casos_alcance_pct }}% explicados
+          </span>
         </div>
         <div class="cifra">
           <span class="etiqueta">Venta perdida</span>
@@ -789,49 +785,52 @@
         <section class="tarjeta">
           <h2>Cumplimiento del proveedor en CEDIS</h2>
           <p class="nota">
-            Confirmado = cajas de cita sobre cajas pedidas. Cumplimiento = entregado sobre
-            confirmado. Efectivo = entregado sobre pedido. Las tres se miden sobre los pedidos que
-            sí tienen cita; los que no la tienen van aparte.
+            Ordenado del <b>peor al mejor nivel de servicio</b>, así que la primera página es el
+            bottom 10. Nivel de servicio = cajas entregadas sobre cajas pedidas, las dos del
+            pedido de compra, sobre el 100% de los pedidos. El <b>OSA del proveedor</b> es la
+            disponibilidad de sus productos en anaquel — es descriptivo, no una boleta: un
+            faltante por ejecución en tienda también lo baja.
           </p>
           <table>
             <thead>
               <tr>
                 <th>Proveedor</th>
-                <th class="num">Pedidos</th>
-                <th class="num">Cajas ped.</th>
-                <th class="num">Surtido</th>
-                <th class="num">Citas</th>
-                <th class="num">Sin cita</th>
-                <th class="num">Confirmado</th>
-                <th class="num">Cumplimiento</th>
-                <th class="num">Efectivo</th>
-                <th class="num">Citas falladas</th>
+                <th class="num">Cajas pedidas</th>
+                <th class="num">Cajas entregadas</th>
+                <th class="num">Nivel de servicio</th>
+                <th class="num">OSA del proveedor</th>
               </tr>
             </thead>
             <tbody>
               @for (p of pgProveedores.items(); track p.proveedor_id) {
                 <tr>
-                  <td>{{ p.nombre || p.proveedor_id }}</td>
-                  <td class="num">{{ p.pedidos | number }}</td>
+                  <td>
+                    <span class="celda-sku" [title]="p.nombre || p.proveedor_id">
+                      {{ p.nombre || p.proveedor_id }}
+                      @if (p.ids.length > 1) {
+                        <small>{{ p.ids.length }} altas consolidadas</small>
+                      }
+                    </span>
+                  </td>
                   <td class="num">{{ p.cajas_pedidas | number }}</td>
-                  <td class="num" [class]="semaforo(p.pct_surtido_pedido)">
-                    {{ p.pct_surtido_pedido | percent: '1.1-1' }}
+                  <td class="num">{{ p.cajas_surtidas | number }}</td>
+                  <td class="num" [class]="semaforo(p.nivel_servicio)">
+                    {{ p.nivel_servicio | percent: '1.1-1' }}
                   </td>
-                  <td class="num">{{ p.citas | number }}</td>
-                  <td class="num" [class.medio]="p.pedidos_sin_cita > 0">
-                    {{ p.pedidos_sin_cita | number }}
+                  <!-- Sin SKU de este proveedor en el catálogo de la tienda no
+                       hay OSA que reportar: se dice, no se inventa un 0%. -->
+                  <td class="num" [title]="(p.dias_evaluados || 0) + ' días evaluados'">
+                    @if (p.osa_periodo !== null) {
+                      {{ p.osa_periodo | number: '1.1-1' }}%
+                    } @else {
+                      —
+                    }
                   </td>
-                  <td class="num">{{ p.pct_confirmado | percent: '1.1-1' }}</td>
-                  <td class="num">{{ p.pct_cumplimiento | percent: '1.1-1' }}</td>
-                  <td class="num" [class]="semaforo(p.pct_efectivo)">
-                    {{ p.pct_efectivo | percent: '1.1-1' }}
-                  </td>
-                  <td class="num">{{ p.citas_incumplidas | number }}</td>
                 </tr>
               }
               @if (!pgProveedores.total()) {
                 <tr>
-                  <td colspan="10" class="vacio">Ningún proveedor coincide con el filtro.</td>
+                  <td colspan="5" class="vacio">Ningún proveedor coincide con el filtro.</td>
                 </tr>
               }
             </tbody>

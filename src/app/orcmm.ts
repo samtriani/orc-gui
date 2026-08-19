@@ -157,6 +157,15 @@ export interface FilaProveedor {
   nombre: string;
   pedidos: number;
   cajas_pedidas: number;
+  /** Cajas que COMPRAS reporta entregadas al cerrar el pedido. Viene en el
+   *  100% de los pedidos, a diferencia de cajas_entregadas (de la cita). */
+  cajas_surtidas: number;
+  /** Cajas entregadas / cajas pedidas, ambas de COMPRAS. */
+  nivel_servicio: number | null;
+  /** Disponibilidad de los SKU de este proveedor. Descriptivo, no atributivo:
+   *  un faltante por ejecución en tienda también lo baja. */
+  osa_periodo: number | null;
+  dias_evaluados: number | null;
   pct_surtido_pedido: number | null;
   citas: number;
   pedidos_sin_cita: number;
