@@ -462,7 +462,9 @@ export class App {
    *  cada renglón ya trae su propia venta_perdida, no hay nada que
    *  recalcular mal. El orden (mayor venta perdida primero) lo pone el
    *  backend y el filtro no lo revuelve. */
-  readonly topSkus = computed(() => this.skusFiltrados().slice(0, 6));
+  // 10, igual que el bottom y que las tablas paginadas: las dos listas se
+  // leen en paralelo y con tamaños distintos parecía que una escondía algo.
+  readonly topSkus = computed(() => this.skusFiltrados().slice(0, 10));
 
   private readonly ventaMayor = computed(() =>
     Math.max(...this.topSkus().map((s) => s.venta_perdida), 1),

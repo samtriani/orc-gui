@@ -11,8 +11,12 @@
  */
 import { Component, Signal, computed, input, signal } from '@angular/core';
 
-/** Cuántos renglones por página. El primero es el que se usa por omisión. */
-export const TAMANOS = [20, 50, 100] as const;
+/** Cuántos renglones por página. El primero es el que se usa por omisión.
+ *
+ *  10 por omisión para que todas las tablas del resultado abran del mismo
+ *  tamaño y quepan de un vistazo, sin scroll. Los tamaños grandes siguen
+ *  disponibles en el selector para cuando se quiere barrer una lista larga. */
+export const TAMANOS = [10, 20, 50, 100] as const;
 
 export class Paginador<T> {
   readonly pagina = signal(1);
