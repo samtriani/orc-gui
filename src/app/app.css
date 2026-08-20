@@ -729,6 +729,14 @@ tr.fila-mal td {
   color: #fff;
 }
 
+/* La jerarquía comercial va bajo una línea tenue: es el mismo cajón de
+   filtros, pero un grupo aparte —y en cascada— del de arriba. */
+.filtros-fila.jerarquia {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--linea);
+}
+
 .limpiar {
   flex: 0 0 auto;
   padding: 7px 14px;

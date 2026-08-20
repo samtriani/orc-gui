@@ -471,6 +471,43 @@
           }
         </div>
 
+        <!--
+          Jerarquía comercial. Va en su propio renglón porque los cuatro
+          niveles se leen de izquierda a derecha, de lo general a lo
+          particular, y porque están EN CASCADA: las opciones de cada uno
+          salen de lo que dejó vivo el de su izquierda.
+        -->
+        @if (hayJerarquia()) {
+          <div class="filtros-fila jerarquia">
+            @for (n of niveles; track n.clave) {
+              <label class="campo ancho">
+                <span>{{ n.etiqueta }}</span>
+                <div class="campo-multi">
+                  @for (v of filtroNivel[n.clave](); track v) {
+                    <span class="ficha-filtro">
+                      {{ v }}
+                      <button type="button" (click)="quitarNivel(n.clave, v)" title="Quitar">×</button>
+                    </span>
+                  }
+                  <input
+                    type="search"
+                    [attr.list]="'lista-' + n.clave"
+                    [placeholder]="opcionesNivel()[n.clave].length + ' opciones'"
+                    [value]="entradaNivel[n.clave]()"
+                    (input)="ponEntradaNivel($event, n.clave)"
+                    (keydown)="agregarNivel($event, n.clave)"
+                  />
+                  <datalist [id]="'lista-' + n.clave">
+                    @for (o of opcionesNivel()[n.clave]; track o) {
+                      <option [value]="o"></option>
+                    }
+                  </datalist>
+                </div>
+              </label>
+            }
+          </div>
+        }
+
         <!-- ficha del SKU buscado -->
         @if (fichaSku(); as f) {
           <div class="ficha">

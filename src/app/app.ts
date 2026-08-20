@@ -1,5 +1,5 @@
 import { DecimalPipe, PercentPipe, SlicePipe } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, WritableSignal, computed, inject, signal } from '@angular/core';
 import { Observable } from 'rxjs';
 import { Analisis, CitaFallada, Expediente, FilaCausa, FilaProveedor, FilaResponsable,
          FilaSkuTienda, Orcmm, Tienda, Waterfall } from './orcmm';
@@ -17,6 +17,13 @@ function normalizar(s: string): string {
     .toLowerCase()
     .trim();
 }
+
+/** Los cuatro niveles de la jerarquía comercial, de lo general a lo
+ *  particular. El orden IMPORTA: es el que define la cascada de los filtros
+ *  —elegir una sección acota las categorías, y así hacia abajo—, y los
+ *  nombres son los mismos campos que manda el backend en `por_sku_tienda`. */
+const NIVELES = ['seccion', 'categoria', 'subcategoria', 'marca'] as const;
+type Nivel = (typeof NIVELES)[number];
 
 type Paso = 'inicio' | 'trabajando' | 'bloqueado' | 'listo' | 'sin-datos' | 'error';
 
@@ -532,6 +539,35 @@ export class App {
   readonly filtroProveedor = signal<string[]>([]);
   readonly entradaProveedor = signal('');
 
+  /** Jerarquía comercial. Los cuatro niveles funcionan igual que el de SKU
+   *  —fichas y autocompletar— así que se guardan en un mapa por nivel y no
+   *  como cuatro señales sueltas: la plantilla los pinta con un solo `@for`
+   *  y los handlers son uno solo con el nivel de parámetro. */
+  readonly filtroNivel: Record<Nivel, WritableSignal<string[]>> = {
+    seccion: signal<string[]>([]),
+    categoria: signal<string[]>([]),
+    subcategoria: signal<string[]>([]),
+    marca: signal<string[]>([]),
+  };
+  readonly entradaNivel: Record<Nivel, WritableSignal<string>> = {
+    seccion: signal(''),
+    categoria: signal(''),
+    subcategoria: signal(''),
+    marca: signal(''),
+  };
+
+  readonly niveles: { clave: Nivel; etiqueta: string }[] = [
+    { clave: 'seccion', etiqueta: 'Sección' },
+    { clave: 'categoria', etiqueta: 'Categoría' },
+    { clave: 'subcategoria', etiqueta: 'Subcategoría' },
+    { clave: 'marca', etiqueta: 'Marca' },
+  ];
+
+  // No hay filtro de Formato a propósito: el análisis corre sobre UNA tienda
+  // (ver /api/analizar-tienda), así que el formato es el mismo en todos los
+  // renglones y el desplegable saldría siempre con una sola opción. El
+  // formato de la tienda se lee arriba, en el encabezado.
+
   readonly hayFiltro = computed(
     () =>
       !!(
@@ -539,7 +575,8 @@ export class App {
         this.filtroTienda() ||
         this.filtroCausa() ||
         this.filtroResponsable() ||
-        this.filtroProveedor().length
+        this.filtroProveedor().length ||
+        NIVELES.some((n) => this.filtroNivel[n]().length)
       ),
   );
 
@@ -567,6 +604,53 @@ export class App {
 
   readonly proveedoresDisponibles = computed(() =>
     [...new Set((this.resultado()?.proveedores ?? []).map((p) => p.nombre || p.proveedor_id))].sort(),
+  );
+
+  /** El catálogo de combinaciones de jerarquía comercial. Cada SKU y cada
+   *  renglón del universo traen un índice a esta lista en vez de los cuatro
+   *  textos: repetirlos costaba 1.3 MB de respuesta. */
+  private readonly combos = computed(() => this.resultado()?.jerarquia ?? []);
+
+  /** Los combos que de verdad aparecen en el resultado. El catálogo puede
+   *  traer combinaciones que sólo usa el universo, y las opciones de los
+   *  filtros salen de aquí. */
+  private readonly combosVivos = computed(() => {
+    const combos = this.combos();
+    const usados = new Set<number>();
+    for (const s of this.resultado()?.por_sku_tienda ?? []) usados.add(s.j);
+    for (const u of this.resultado()?.detalle_dias?.universo ?? []) usados.add(u.j);
+    return [...usados].map((j) => combos[j]).filter((c) => !!c);
+  });
+
+  /**
+   * Las opciones de los cuatro niveles, EN CASCADA: cada uno se calcula
+   * sobre los combos que ya sobrevivieron a los de arriba, así que elegir
+   * "GOURMET" en Sección deja en Categoría sólo las que existen dentro de
+   * Gourmet, y en Subcategoría sólo las de esa categoría.
+   *
+   * Se sacan del resultado y no del catálogo completo a propósito: si una
+   * subcategoría no tuvo un solo faltante en el periodo, ofrecerla sería
+   * mandar al usuario a una pantalla vacía. Y salen los cuatro de una
+   * pasada, porque la lista se va recortando mientras se baja de nivel.
+   */
+  readonly opcionesNivel = computed(() => {
+    let vivos = this.combosVivos();
+    const opciones = {} as Record<Nivel, string[]>;
+    NIVELES.forEach((n, nivel) => {
+      opciones[n] = [
+        ...new Set(vivos.map((c) => c[nivel]).filter((v): v is string => !!v)),
+      ].sort();
+      const puestas = this.filtroNivel[n]();
+      if (puestas.length) vivos = vivos.filter((c) => this.coincideAlguna([c[nivel]], puestas));
+    });
+    return opciones;
+  });
+
+  /** Si el análisis corrió sin catálogo comercial (modo archivo, o la tabla
+   *  todavía sin cargar) estos filtros no tienen nada que ofrecer: el bloque
+   *  se esconde en vez de aparecer vacío y hacer creer que no hay datos. */
+  readonly hayJerarquia = computed(() =>
+    NIVELES.some((n) => this.opcionesNivel()[n].length > 0),
   );
 
   // -- opciones de los desplegables, sacadas de los propios datos ----------
@@ -620,17 +704,37 @@ export class App {
     });
   }
 
+  /**
+   * ¿Qué combos de jerarquía pasan los filtros puestos? Un arreglo de
+   * booleanos indexado por la misma `j` que traen los renglones.
+   *
+   * La gracia es que se decide UNA VEZ POR COMBO —unos miles— y no una vez
+   * por renglón: el universo trae decenas de miles y los días, más. Y
+   * cuando no hay ningún nivel puesto devuelve `null`, que las listas leen
+   * como "no filtres" y les ahorra la vuelta entera.
+   */
+  private readonly combosQuePasan = computed<boolean[] | null>(() => {
+    const puestas = NIVELES.map((n) => this.filtroNivel[n]());
+    if (!puestas.some((p) => p.length)) return null;
+    // Un SKU sin ficha comercial (fuera del catálogo, RC00) cae en el combo
+    // de puros nulos y no pertenece a ninguna sección: con un filtro puesto
+    // queda fuera, también del denominador del waterfall.
+    return this.combos().map((c) => puestas.every((p, i) => this.coincideAlguna([c[i]], p)));
+  });
+
   readonly skusFiltrados = computed<FilaSkuTienda[]>(() => {
     const skus = this.filtroSku();
     const tienda = this.filtroTienda();
     const causa = this.filtroCausa();
     const resp = this.filtroResponsable();
+    const pasa = this.combosQuePasan();
     return (this.resultado()?.por_sku_tienda ?? []).filter(
       (s) =>
         this.coincideAlguna([s.sku, s.descripcion], skus) &&
         (!tienda || s.tienda === tienda) &&
         (!causa || s.root_cause_id === causa) &&
-        (!resp || s.responsable === resp),
+        (!resp || s.responsable === resp) &&
+        (!pasa || pasa[s.j] === true),
     );
   });
 
@@ -697,11 +801,25 @@ export class App {
     if (!det) return [];
     const skus = this.filtroSku();
     const tienda = this.filtroTienda();
+    const pasa = this.combosQuePasan();
+    const jDe = this.jPorSkuTienda();
     return det.dias.filter(
       (d) =>
         this.coincideAlguna([d.s, this.descripcionDe(d.s)], skus) &&
-        (!tienda || d.t === tienda),
+        (!tienda || d.t === tienda) &&
+        (!pasa || pasa[jDe.get(d.s + '|' + d.t) ?? -1] === true),
     );
+  });
+
+  /** (sku|tienda) -> índice de jerarquía. Los días no traen `j` propio —son
+   *  decenas de miles de renglones y cargarían ocho bytes cada uno— y no les
+   *  hace falta: salen de la misma lista `en_alcance` que `por_sku_tienda`,
+   *  así que su combo siempre está aquí. El universo sí lo trae, porque ése
+   *  puede incluir SKU que no tuvieron ni un día con faltante. */
+  private readonly jPorSkuTienda = computed(() => {
+    const m = new Map<string, number>();
+    for (const s of this.resultado()?.por_sku_tienda ?? []) m.set(s.sku + '|' + s.tienda, s.j);
+    return m;
   });
 
   /** sku -> descripción, para que filtrar por nombre también recorte estos
@@ -724,11 +842,13 @@ export class App {
     if (!det) return 0;
     const skus = this.filtroSku();
     const tienda = this.filtroTienda();
+    const pasa = this.combosQuePasan();
     return det.universo
       .filter(
         (u) =>
           this.coincideAlguna([u.s, this.descripcionDe(u.s)], skus) &&
-          (!tienda || u.t === tienda),
+          (!tienda || u.t === tienda) &&
+          (!pasa || pasa[u.j] === true),
       )
       .reduce((a, u) => a + u.n, 0);
   });
@@ -954,6 +1074,40 @@ export class App {
     this.entradaProveedor.set('');
   }
 
+  /** Los cuatro niveles se manejan con los mismos tres handlers: sólo cambia
+   *  cuál señal tocan. Misma mecánica que SKU y proveedor —Enter agrega,
+   *  elegir del `<datalist>` agrega solo. */
+  ponEntradaNivel(e: Event, n: Nivel): void {
+    const previo = this.entradaNivel[n]();
+    const valor = (e.target as HTMLInputElement).value;
+    this.entradaNivel[n].set(valor);
+    if (this.vinoDeLaLista(e, previo, valor, this.opcionesNivel()[n])) this.confirmarNivel(n);
+  }
+
+  agregarNivel(e: KeyboardEvent, n: Nivel): void {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    this.confirmarNivel(n);
+  }
+
+  private confirmarNivel(n: Nivel): void {
+    const valor = this.entradaNivel[n]().trim();
+    if (!valor) return;
+    if (!this.filtroNivel[n]().some((x) => normalizar(x) === normalizar(valor))) {
+      this.filtroNivel[n].update((xs) => [...xs, valor]);
+      this.reiniciarPaginas();
+    }
+    this.entradaNivel[n].set('');
+  }
+
+  /** Quitar una ficha NO borra las de los niveles de abajo: quedaron elegidas
+   *  a propósito y siguen filtrando por su cuenta. Para empezar de cero está
+   *  "Limpiar". */
+  quitarNivel(n: Nivel, valor: string): void {
+    this.filtroNivel[n].update((xs) => xs.filter((x) => x !== valor));
+    this.reiniciarPaginas();
+  }
+
   quitarSku(sku: string): void {
     this.filtroSku.update((skus) => skus.filter((s) => s !== sku));
     this.reiniciarPaginas();
@@ -987,6 +1141,10 @@ export class App {
     this.filtroResponsable.set('');
     this.filtroProveedor.set([]);
     this.entradaProveedor.set('');
+    for (const n of NIVELES) {
+      this.filtroNivel[n].set([]);
+      this.entradaNivel[n].set('');
+    }
     this.reiniciarPaginas();
   }
 

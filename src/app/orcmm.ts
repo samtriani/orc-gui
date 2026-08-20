@@ -121,6 +121,10 @@ export interface FilaSkuTienda {
   tienda: string;
   /** De CATALOGO — para poder buscar por nombre además de por código. */
   descripcion: string | null;
+  /** Índice al catálogo `Analisis.jerarquia`: sección, categoría,
+   *  subcategoría y marca. Es un índice y no los cuatro textos porque
+   *  escribirlos en cada renglón pesaba 1.3 MB de más. */
+  j: number;
   dias_con_faltante: number;
   dias_clasificados: number;
   cobertura_pct: number;
@@ -206,8 +210,13 @@ export interface DetalleDias {
   /** s=sku · t=tienda · c=índice en `causas` · v=venta perdida. */
   dias: { s: string; t: string; c: number; v: number }[];
   /** Filas de BOPS del alcance por SKU-tienda: el denominador del waterfall,
-   *  desglosado para poder recomponerlo al filtrar. */
-  universo: { s: string; t: string; n: number }[];
+   *  desglosado para poder recomponerlo al filtrar.
+   *
+   *  Trae `j` —índice en `Analisis.jerarquia`— y los días no, porque esta
+   *  lista sí puede incluir SKU que nunca tuvieron un faltante y por lo
+   *  tanto no aparecen en `por_sku_tienda`. Sin el índice, al filtrar por
+   *  categoría esos se caerían del denominador y el OSA saldría hundido. */
+  universo: { s: string; t: string; n: number; j: number }[];
 }
 
 export interface Correccion {
@@ -268,6 +277,11 @@ export interface Analisis {
   por_subcausa?: FilaSubcausa[];
   por_sku_tienda?: FilaSkuTienda[];
   detalle_dias?: DetalleDias;
+  /** Catálogo de las combinaciones distintas de jerarquía comercial, en el
+   *  orden [sección, categoría, subcategoría, marca]. Lo indexa la `j` de
+   *  cada SKU y de cada renglón del universo. Llega vacío —o con un solo
+   *  combo de nulos— si el análisis corrió sin catálogo comercial. */
+  jerarquia?: (string | null)[][];
   proveedores?: FilaProveedor[];
   citas_falladas?: CitaFallada[];
   discrepancias?: { folio: string; sku: string; motivos: string }[];
