@@ -65,6 +65,7 @@ const MOSTRAR_PANELES_SIN_DATOS = false;
  *  fichas de las tablas, que llevan el texto de la causa al lado: ahí el
  *  color acompaña y no necesita cargar la identidad. */
 const COLOR_CAUSA: Record<string, string> = {
+  RC00: '#E6E0F0', // Fuera de alcance — no es una causa, es un dia que no tocaba explicar
   RC01: '#DDEBF7',
   RC02: '#FFEB9C',
   RC03: '#FFC7CE',
@@ -110,6 +111,7 @@ const COLOR_CAUSA_TIRA: Record<string, string> = {
   RC04: '#00a199', // CEDIS No Surtió            —  0.1%
   RC03: '#b07500', // Pedido de Tienda No Gen.
   RC99: '#a10c22', // Sin clasificar — rojo: es una alarma, no una causa
+  RC00: '#8f86a8', // Fuera de alcance — malva apagado: no es alarma, es "no tocaba"
 };
 
 @Component({

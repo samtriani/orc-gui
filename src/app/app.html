@@ -365,11 +365,11 @@
       @if (hayFueraDeAlcance()) {
         <p class="aviso medio">
           BOPS entregó {{ r.cobertura!.casos_totales | number }} días con faltante, de los
-          cuales <b>{{ r.cobertura!.casos_fuera_de_alcance | number }}</b> son de SKU que el
-          catálogo de la tienda no reconoce y quedan fuera del análisis. Sobre todo lo que
-          entregó BOPS el OSA sería {{ r.osa_general }}%; ese número mide la extracción, no la
-          disponibilidad. Si el export debería venir filtrado a la división del catálogo, hay
-          que pedirlo así.
+          cuales <b>{{ r.cobertura!.casos_fuera_de_alcance | number }}</b> son de divisiones que
+          este análisis no cubre: <b>BOPS entrega toda la tienda y el catálogo sólo trae
+          Abarrotes</b>. No es un dato que falte — esos días no le tocaba explicarlos.
+          Sobre todo lo que entregó BOPS el OSA sería {{ r.osa_general }}%; ese número mide la
+          extracción, no la disponibilidad, y por eso arriba va el del alcance.
         </p>
       }
 
