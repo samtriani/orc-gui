@@ -392,6 +392,7 @@
                 </span>
               }
               <input
+                #cajaFiltro
                 type="search"
                 list="lista-skus"
                 placeholder="Código o nombre del producto, y Enter"
@@ -451,6 +452,7 @@
                 </span>
               }
               <input
+                #cajaFiltro
                 type="search"
                 list="lista-proveedores"
                 placeholder="Nombre del proveedor y Enter"
@@ -490,6 +492,7 @@
                     </span>
                   }
                   <input
+                    #cajaFiltro
                     type="search"
                     [attr.list]="'lista-' + n.clave"
                     [placeholder]="opcionesNivel()[n.clave].length + ' opciones'"

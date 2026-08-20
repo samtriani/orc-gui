@@ -1,5 +1,6 @@
 import { DecimalPipe, PercentPipe, SlicePipe } from '@angular/common';
-import { Component, WritableSignal, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, WritableSignal, computed, inject, signal,
+         viewChildren } from '@angular/core';
 import { Observable } from 'rxjs';
 import { Analisis, CitaFallada, Expediente, FilaCausa, FilaProveedor, FilaResponsable,
          FilaSkuTienda, Orcmm, Tienda, Waterfall } from './orcmm';
@@ -568,6 +569,19 @@ export class App {
   // renglones y el desplegable saldría siempre con una sola opción. El
   // formato de la tienda se lee arriba, en el encabezado.
 
+  /**
+   * Las cajas de texto de los filtros con fichas (SKU, proveedor y los
+   * cuatro niveles), para poder vaciarlas a mano al limpiar.
+   *
+   * Hace falta porque `[value]` no basta. Cuando el navegador confirma una
+   * sugerencia del `<datalist>` escribe el texto en el input por su cuenta;
+   * nuestro handler mete la ficha y deja la señal en vacío, así que Angular
+   * anota "este binding vale ''" mientras la caja se quedó con el texto. Al
+   * darle Limpiar, la señal ya valía '' —no cambió nada— y el binding no
+   * escribe: el texto se queda pegado aunque el filtro sí se haya ido.
+   */
+  private readonly cajasFiltro = viewChildren<ElementRef<HTMLInputElement>>('cajaFiltro');
+
   readonly hayFiltro = computed(
     () =>
       !!(
@@ -589,8 +603,14 @@ export class App {
   // código — la ficha del filtro no necesita el nombre completo.
 
   readonly opcionesSku = computed(() => {
+    // El SKU es el último eslabón de la cascada: si ya elegiste CERVEZA en
+    // Sección, aquí sólo se sugieren cervezas. Al revés no —elegir un SKU no
+    // acota las secciones— porque el SKU es lo más particular que hay: el
+    // resto de los niveles quedarían con un solo valor cada uno.
+    const pasa = this.combosQuePasan();
     const vistos = new Map<string, string | null>();
     for (const s of this.resultado()?.por_sku_tienda ?? []) {
+      if (pasa && pasa[s.j] !== true) continue;
       if (!vistos.has(s.sku)) vistos.set(s.sku, s.descripcion);
     }
     return [...vistos]
@@ -1145,6 +1165,9 @@ export class App {
       this.filtroNivel[n].set([]);
       this.entradaNivel[n].set('');
     }
+    // Y las cajas por su cuenta: ver `cajasFiltro`. Limpiar tiene que dejar
+    // la pantalla como recién llegó, texto a medio escribir incluido.
+    for (const caja of this.cajasFiltro()) caja.nativeElement.value = '';
     this.reiniciarPaginas();
   }
 
