@@ -132,6 +132,8 @@ export class App {
   /** Cuánto lleva EN SU FASE actual, según el backend. */
   readonly segundos = signal(0);
   readonly fase = signal<'en_cola' | 'corriendo'>('corriendo');
+  /** En qué fase de la corrida va, según el backend. */
+  readonly etapa = signal<string | null>(null);
   readonly delante = signal(0);
   /** El id en vuelo, para poder cancelarlo. */
   readonly idEnVuelo = signal<string | null>(null);
@@ -299,6 +301,7 @@ export class App {
     this.yaHayUno.set(null);
     this.segundos.set(0);
     this.fase.set('corriendo');
+    this.etapa.set(null);
     this.delante.set(0);
     this.cancelando.set(false);
 
@@ -308,6 +311,7 @@ export class App {
         if (r.estado === 'en_proceso') {
           this.segundos.set(r.segundos ?? 0);
           this.fase.set(r.fase ?? 'corriendo');
+          this.etapa.set(r.etapa ?? null);
           this.delante.set(r.delante ?? 0);
           return;
         }

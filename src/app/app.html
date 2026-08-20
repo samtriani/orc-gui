@@ -153,7 +153,13 @@
           }
         </p>
       } @else {
-        <p>Validando la captura y clasificando los días con faltante…</p>
+        <!-- La etapa la manda el backend. Sin ella el mensaje es el mismo
+             durante minutos y no se distingue avanzar de atorarse. -->
+        @if (etapa(); as e) {
+          <p>{{ e }}…</p>
+        } @else {
+          <p>Validando la captura y clasificando los días con faltante…</p>
+        }
       }
 
       <p class="nota">

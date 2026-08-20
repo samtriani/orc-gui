@@ -227,6 +227,10 @@ export interface Analisis {
   fase?: 'en_cola' | 'corriendo';
   /** Sólo en 'en_proceso': segundos EN LA FASE actual, no desde que se pidió. */
   segundos?: number;
+  /** Sólo mientras corre: en qué va — "leyendo catálogo", "clasificando por
+   *  causa raíz", "generando el Excel". Sin esto la pantalla dice lo mismo
+   *  durante minutos y no hay forma de saber si avanza o se atoró. */
+  etapa?: string;
   /** Sólo en 'en_cola': cuántos hay formados adelante. */
   delante?: number;
 
