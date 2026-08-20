@@ -379,6 +379,28 @@
         </p>
       }
 
+      <!-- El letrero de la exclusión por SIMA. NO es opcional: sin él, la
+           cobertura y la venta perdida de arriba mienten por omisión, porque
+           están calculadas sobre un universo más chico. Va en rojo y no en
+           ámbar como el de fuera de alcance, porque aquí el dato SÍ debía
+           existir. Ver EXCLUIR_SKU_SIN_SIMA en el backend. -->
+      @if (r.excluidos_sin_sima?.skus; as excluidos) {
+        <p class="aviso mal">
+          <b>Análisis parcial: {{ r.excluidos_sin_sima!.skus_en_alcance | number }} SKU de
+          {{ excluidos + r.excluidos_sin_sima!.skus_en_alcance | number }}.</b>
+          Se dejaron fuera <b>{{ excluidos | number }} SKU</b> porque SIMA no trae ni un pedido
+          de ellos en el periodo, y sin ese dato no se puede saber si la tienda pidió.
+          Con ellos quedan fuera <b>{{ r.excluidos_sin_sima!.dias_con_faltante | number }} días
+          con faltante</b> y <b>${{ r.excluidos_sin_sima!.venta_perdida | number: '1.0-0' }}</b>
+          de venta perdida, que NO están en las cifras de arriba.
+          <br />
+          Ojo: no es que a esos SKU no les tocara — están en el catálogo, activos y se resurten
+          vía CEDIS, así que su pedido sí debía existir. <b>Es un dato que falta, no un SKU
+          fuera de alcance</b>, y por eso el OSA y la cobertura de arriba salen mejor de lo que
+          serían con la foto completa. Se corrige cuando SIMA entregue todos los SKU.
+        </p>
+      }
+
       <!-- ====================== FILTROS ====================== -->
       <section class="tarjeta filtros" id="filtros">
         <div class="filtros-fila">

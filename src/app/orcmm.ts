@@ -144,6 +144,26 @@ export interface FilaSkuTienda {
   responsable: string;
 }
 
+/**
+ * Lo que se dejó FUERA del análisis por no tener datos de SIMA.
+ *
+ * Estos SKU no están fuera de alcance de verdad: están en el catálogo,
+ * activos, y su pedido a CEDIS sí debía existir. Se excluyen porque sin ese
+ * dato la prioridad 3 no se puede contestar, y dejarlos dentro llenaba el
+ * waterfall de una barra de "Sin clasificar" que no dice nada del negocio.
+ *
+ * El precio es que la cobertura se calcula sobre un universo más chico. Por
+ * eso estas cifras NO son opcionales en pantalla: sin ellas, un "100% de
+ * cobertura" y una venta perdida más baja mienten por omisión.
+ */
+export interface ExcluidosSinSima {
+  skus: number;
+  dias_con_faltante: number;
+  venta_perdida: number;
+  /** Sobre cuántos SKU del catálogo sí se analizó — el denominador honesto. */
+  skus_en_alcance: number;
+}
+
 /** Nivel de servicio de CEDIS a tienda, en PIEZAS (SIMA no entrega cajas). */
 export interface NivelServicioTienda {
   pedidos: number;
@@ -271,6 +291,7 @@ export interface Analisis {
   waterfall?: Waterfall;
   fill_rate_proveedor?: FillRate;
   nivel_servicio_tienda?: NivelServicioTienda;
+  excluidos_sin_sima?: ExcluidosSinSima;
   cobertura?: Cobertura;
   por_causa?: FilaCausa[];
   por_responsable?: FilaResponsable[];
