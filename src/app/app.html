@@ -848,6 +848,40 @@
         </section>
       </div>
 
+      <!-- Detalle de la causa. Va ANTES del proveedor y como tarjeta propia:
+           estaba anidada dentro de la de proveedor, que es otro tema —una
+           reparte causas raíz, la otra califica a los proveedores— y ahí
+           quedaba escondida al final de una tabla larga. -->
+      @if (r.por_subcausa?.length) {
+        <section class="tarjeta">
+          <h2>¿Qué detalle de la causa costó más?</h2>
+          <p class="nota">
+            El desglose fino de la causa raíz: no sólo <i>qué</i> falló, sino <i>cómo</i>. Es lo
+            que cambia la conversación — no es lo mismo que el proveedor nunca agendara cita, a
+            que agendara y entregara de menos.
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Detalle / subcausa</th>
+                <th class="num">Impactos (SKU × días con faltante)</th>
+                <th class="num">Venta perdida</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (s of pgSubcausas.items(); track s.subcausa) {
+                <tr>
+                  <td>{{ s.subcausa }}</td>
+                  <td class="num">{{ s.dias | number }}</td>
+                  <td class="num">${{ s.venta_perdida | number: '1.2-2' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+          <app-paginador [p]="pgSubcausas" />
+        </section>
+      }
+
       <!-- proveedor -->
       @if (r.proveedores?.length) {
         <section class="tarjeta">
@@ -904,36 +938,13 @@
             </tbody>
           </table>
           <app-paginador [p]="pgProveedores" />
-
-          @if (r.por_subcausa?.length) {
-            <h3>Qué detalle de la causa costó más</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Detalle / subcausa</th>
-                  <th class="num">Impactos (SKU × días con faltante)</th>
-                  <th class="num">Venta perdida</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (s of pgSubcausas.items(); track s.subcausa) {
-                  <tr>
-                    <td>{{ s.subcausa }}</td>
-                    <td class="num">{{ s.dias | number }}</td>
-                    <td class="num">${{ s.venta_perdida | number: '1.2-2' }}</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-            <app-paginador [p]="pgSubcausas" />
-          }
         </section>
       }
 
       <!-- qué faltó -->
       @if (r.cobertura!.bloqueos.length) {
         <section class="tarjeta">
-          <h2>Qué dato bloqueó la clasificación</h2>
+          <h2>¿Qué dato bloqueó la clasificación?</h2>
           <p class="nota">
             El campo que más se repite es el que más caro está saliendo. Es la lista para priorizar
             qué fuente integrar primero.
