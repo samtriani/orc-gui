@@ -894,16 +894,27 @@ export class App {
     const universo = this.universoFiltrado();
     if (!universo) return { ...base, osa_real: null, universo_filas: 0, escalones: [] };
 
-    const dias = new Map<number, number>();
-    for (const d of this.diasFiltrados()) dias.set(d.c, (dias.get(d.c) ?? 0) + 1);
+    // Se agrupa por CAUSA, no por el índice del catálogo. Desde que ese
+    // catálogo distingue subcausas, un mismo RC01 vive en varias entradas —
+    // "ignoró la alerta" y "nunca fue notificada" son índices distintos— y
+    // agrupar por índice partía la causa en dos escalones que además
+    // repetían la llave del @for. El backend agrupa por `causa_raiz`; esto
+    // tiene que hacer lo mismo o el waterfall filtrado y el sin filtrar
+    // dejan de decir lo mismo.
+    const dias = new Map<string, { n: number; c: number }>();
+    for (const d of this.diasFiltrados()) {
+      const acc = dias.get(det.causas[d.c].causa) ?? { n: 0, c: d.c };
+      acc.n += 1;
+      dias.set(det.causas[d.c].causa, acc);
+    }
 
     const escalones = [...dias]
-      .map(([i, n]) => ({
-        root_cause_id: det.causas[i].root_cause_id,
-        causa: det.causas[i].causa,
-        responsable: det.causas[i].responsable,
-        dias: n,
-        puntos_osa: Math.round((n / universo) * 10000) / 100,
+      .map(([causa, acc]) => ({
+        root_cause_id: det.causas[acc.c].root_cause_id,
+        causa,
+        responsable: det.causas[acc.c].responsable,
+        dias: acc.n,
+        puntos_osa: Math.round((acc.n / universo) * 10000) / 100,
       }))
       .sort((a, b) => b.puntos_osa - a.puntos_osa);
 
