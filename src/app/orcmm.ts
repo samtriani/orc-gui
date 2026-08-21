@@ -226,7 +226,14 @@ export interface CitaFallada {
  * índice — para no repetir los textos en ~5,200 renglones.
  */
 export interface DetalleDias {
-  causas: { root_cause_id: string; causa: string; responsable: string }[];
+  /** `subcausa` va en el catálogo y no en cada día: son unas pocas
+   *  combinaciones distintas contra decenas de miles de renglones. */
+  causas: {
+    root_cause_id: string;
+    causa: string;
+    responsable: string;
+    subcausa: string | null;
+  }[];
   /** s=sku · t=tienda · c=índice en `causas` · v=venta perdida. */
   dias: { s: string; t: string; c: number; v: number }[];
   /** Filas de BOPS del alcance por SKU-tienda: el denominador del waterfall,

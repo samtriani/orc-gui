@@ -3,7 +3,7 @@ import { Component, ElementRef, WritableSignal, computed, inject, signal,
          viewChildren } from '@angular/core';
 import { Observable } from 'rxjs';
 import { Analisis, CitaFallada, Expediente, FilaCausa, FilaProveedor, FilaResponsable,
-         FilaSkuTienda, Orcmm, Tienda, Waterfall } from './orcmm';
+         FilaSkuTienda, FilaSubcausa, Orcmm, Tienda, Waterfall } from './orcmm';
 import { Paginador, PaginadorCtrl } from './paginacion';
 
 /** Comparación laxa para los filtros de texto: sin acentos, sin mayúsculas y
@@ -958,6 +958,34 @@ export class App {
       : (this.resultado()?.por_responsable ?? []),
   );
 
+  /** El desglose fino, recalculado sobre los días filtrados.
+   *
+   *  Mismo criterio que el backend: los días sin subcausa no cuentan —la
+   *  subcausa sólo existe en las prioridades 3 y 8—, así que esta tabla suma
+   *  menos días que los Pareto de arriba. No es un descuadre: es que no toda
+   *  causa raíz tiene detalle. */
+  readonly porSubcausaFiltrado = computed<FilaSubcausa[]>(() => {
+    if (!this.hayFiltro()) return this.resultado()?.por_subcausa ?? [];
+    const det = this.resultado()?.detalle_dias;
+    if (!det) return [];
+    const acc = new Map<string, { dias: number; vp: number }>();
+    for (const d of this.diasFiltrados()) {
+      const sub = det.causas[d.c].subcausa;
+      if (!sub) continue;
+      const a = acc.get(sub) ?? { dias: 0, vp: 0 };
+      a.dias += 1;
+      a.vp += d.v;
+      acc.set(sub, a);
+    }
+    return [...acc]
+      .map(([subcausa, a]) => ({
+        subcausa,
+        dias: a.dias,
+        venta_perdida: Math.round(a.vp * 100) / 100,
+      }))
+      .sort((x, y) => y.venta_perdida - x.venta_perdida || y.dias - x.dias);
+  });
+
   // -- ficha del/los SKU buscados ------------------------------------------
 
   /** Los renglones de los SKU elegidos, ignorando los demás filtros: si
@@ -1003,12 +1031,12 @@ export class App {
   readonly pgCitas = new Paginador(this.citasFiltradas);
   readonly pgCausas = new Paginador(this.porCausaFiltrado);
   readonly pgResponsables = new Paginador(this.porResponsableFiltrado);
-  readonly pgSubcausas = new Paginador(computed(() => this.resultado()?.por_subcausa ?? []));
+  readonly pgSubcausas = new Paginador(this.porSubcausaFiltrado);
   readonly pgBloqueos = new Paginador(computed(() => this.resultado()?.cobertura?.bloqueos ?? []));
 
   private reiniciarPaginas(): void {
     for (const p of [this.pgSkus, this.pgProveedores, this.pgCitas,
-                     this.pgCausas, this.pgResponsables]) p.reiniciar();
+                     this.pgCausas, this.pgResponsables, this.pgSubcausas]) p.reiniciar();
   }
 
   // -- handlers ------------------------------------------------------------

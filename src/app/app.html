@@ -852,7 +852,7 @@
            estaba anidada dentro de la de proveedor, que es otro tema —una
            reparte causas raíz, la otra califica a los proveedores— y ahí
            quedaba escondida al final de una tabla larga. -->
-      @if (r.por_subcausa?.length) {
+      @if (porSubcausaFiltrado().length) {
         <section class="tarjeta">
           <h2>¿Qué detalle de la causa costó más?</h2>
           <p class="nota">
@@ -1115,6 +1115,17 @@
             <app-paginador [p]="pgCitas" />
           }
 
+          <!--
+            OCULTAS, no borradas: "Fuentes leídas" y "Advertencias de lectura"
+            son diagnóstico interno —conteos por hoja, rangos de extracción,
+            avisos del parser— y en una pantalla que se le enseña al cliente
+            desvían la conversación hacia la plomería.
+
+            Siguen viajando en la respuesta (`r.fuentes`, `advertencias()`) y
+            el bloque de arriba "Fuentes que no llegaron completas" sí se
+            queda: ése no es plomería, es la advertencia de que el resultado
+            está acotado. Para depurar, basta con quitar estos comentarios.
+
           <h3>Fuentes leídas</h3>
           <table>
             <thead>
@@ -1147,6 +1158,7 @@
               }
             </ul>
           }
+          -->
         }
       </section>
 
