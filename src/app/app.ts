@@ -463,6 +463,13 @@ export class App {
       next: (a) => {
         this.abriendoCorrida.set(null);
         this.limpiarFiltros();
+        // El periodo de la corrida, no el del formulario: el expediente lo
+        // necesita para pedir el detalle diario, y al abrir del histórico
+        // esas señales están vacías. Sin esto el botón "Ver evolución
+        // diaria" no hacía absolutamente nada.
+        this.tiendaSeleccionada.set(c.tienda);
+        this.fechaDesde.set(c.desde);
+        this.fechaHasta.set(c.hasta);
         this.resultado.set(a);
         this.paso.set('listo');
         this.asegurarNombresDeTienda();
@@ -1416,9 +1423,17 @@ export class App {
   readonly errorExpediente = signal<string | null>(null);
 
   verExpediente(sku: string, tienda: string): void {
-    const desde = this.fechaDesde();
-    const hasta = this.fechaHasta();
-    if (!desde || !hasta) return;
+    // El periodo sale del formulario, y si no está, del sello de la corrida
+    // guardada. Antes esto se salía en silencio cuando faltaba: el botón no
+    // hacía nada y no había forma de saber por qué.
+    const g = this.resultado()?.guardado;
+    const desde = this.fechaDesde() || g?.desde;
+    const hasta = this.fechaHasta() || g?.hasta;
+    if (!desde || !hasta) {
+      this.errorExpediente.set(
+        'No se sabe de qué periodo pedir el detalle. Vuelve a abrir la corrida.');
+      return;
+    }
 
     this.cargandoExpediente.set(true);
     this.errorExpediente.set(null);
