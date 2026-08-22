@@ -1111,7 +1111,7 @@
                 </th>
                 <th>Causa dominante</th>
                 <th>Responsable</th>
-                @if (modo() === 'tienda') {
+                @if (puedeVerExpediente()) {
                   <th></th>
                 }
               </tr>
@@ -1154,7 +1154,7 @@
                     {{ s.causa }}
                   </td>
                   <td>{{ s.responsable }}</td>
-                  @if (modo() === 'tienda') {
+                  @if (puedeVerExpediente()) {
                     <td>
                       <button class="btn-plano" (click)="verExpediente(s.sku, s.tienda)">
                         Evolución diaria

@@ -1,5 +1,5 @@
 import { DatePipe, DecimalPipe, PercentPipe, SlicePipe } from '@angular/common';
-import { Component, ElementRef, WritableSignal, computed, inject, signal,
+import { Component, ElementRef, WritableSignal, computed, effect, inject, signal,
          viewChildren } from '@angular/core';
 import { Observable } from 'rxjs';
 import { Analisis, CitaFallada, Corrida, Expediente, FilaCausa, FilaProveedor,
@@ -138,6 +138,19 @@ export class App {
     // dirían "Tienda 287".
     this.cargarCorridas();
     this.asegurarNombresDeTienda();
+
+    // La evolución diaria es de UN SKU en UNA tienda. Si cambia cualquiera de
+    // los dos, la gráfica abierta deja de corresponder al filtro: el
+    // encabezado decía un código y el filtro otro, y así se lee como si fuera
+    // del que acabas de buscar. Se cierra y que la vuelvan a pedir.
+    //
+    // No se recarga sola a propósito: el filtro de SKU admite varias fichas y
+    // no habría forma de saber cuál de ellas graficar.
+    effect(() => {
+      this.filtroSku();
+      this.filtroTienda();
+      this.cerrarExpediente();
+    });
   }
 
   readonly paso = signal<Paso>('inicio');
@@ -1451,6 +1464,21 @@ export class App {
       },
     });
   }
+
+  /** ¿Se puede pedir el detalle diario de un SKU?
+   *
+   *  La condición real es tener un periodo con el que preguntarle a la API:
+   *  el del formulario cuando el análisis se acaba de correr, o el de la
+   *  corrida al abrirla del histórico. Antes el botón se ataba a
+   *  `modo() === 'tienda'`, y al abrir una corrida guardada el modo seguía en
+   *  'archivo', así que el botón simplemente no se pintaba.
+   *
+   *  El modo archivo sigue quedando fuera, y con razón: no tiene periodo, y
+   *  el expediente lee de Postgres y no del archivo que subieron. */
+  readonly puedeVerExpediente = computed(() => {
+    const g = this.resultado()?.guardado;
+    return !!((this.fechaDesde() || g?.desde) && (this.fechaHasta() || g?.hasta));
+  });
 
   cerrarExpediente(): void {
     this.expedienteAbierto.set(null);
