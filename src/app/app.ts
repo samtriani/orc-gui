@@ -1,7 +1,9 @@
 import { DatePipe, DecimalPipe, PercentPipe, SlicePipe } from '@angular/common';
 import { Component, ElementRef, WritableSignal, computed, effect, inject, signal,
          viewChildren } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, Subject, of } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Analisis, CitaFallada, Corrida, Expediente, FilaCausa, FilaProveedor,
          FilaResponsable, FilaSkuTienda, FilaSubcausa, Orcmm, Tienda,
          Waterfall } from './orcmm';
@@ -151,7 +153,29 @@ export class App {
       this.filtroTienda();
       this.cerrarExpediente();
     });
+
+    // El autocompletar de SKU pregunta al catálogo mientras se escribe. Con
+    // retardo y descartando la anterior: son teclazos, no clics, y una
+    // respuesta vieja llegando tarde pisaría a la nueva.
+    this.tecleoSku
+      .pipe(
+        debounceTime(250),
+        distinctUntilChanged(),
+        switchMap((q) => {
+          const t = this.tiendaDelAnalisis();
+          if (!t || q.trim().length < 2) return of([]);
+          return this.api.buscarSkus(t, q.trim()).pipe(catchError(() => of([])));
+        }),
+        takeUntilDestroyed(),
+      )
+      .subscribe((skus) => this.sugerenciasCatalogo.set(skus));
   }
+
+  private readonly tecleoSku = new Subject<string>();
+  /** Lo que devolvió el catálogo para lo último que se escribió. Se suma a
+   *  las opciones que salen del resultado. */
+  private readonly sugerenciasCatalogo =
+    signal<{ sku: string; descripcion: string | null }[]>([]);
 
   readonly paso = signal<Paso>('inicio');
   readonly archivos = signal<File[]>([]);
@@ -495,6 +519,38 @@ export class App {
     });
   }
 
+  /** El Excel de una corrida guardada. Se genera al pedirlo desde
+   *  `run_dias` —no vuelve a leer fuentes ni a clasificar— pero aun así son
+   *  un par de minutos, así que el botón se queda en "Generando…" y no se
+   *  puede picar dos veces. */
+  readonly generandoExcel = signal<string | null>(null);
+
+  bajarExcelCorrida(c: Corrida, e: Event): void {
+    e.stopPropagation();
+    if (this.generandoExcel()) return;
+    this.generandoExcel.set(c.id);
+    this.error.set(null);
+    this.api.descargar(this.api.urlExcelCorrida(c.id)).subscribe({
+      next: (blob) => {
+        this.generandoExcel.set(null);
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `Resultado RCA - ${c.tienda} ${c.desde} a ${c.hasta}.xlsx`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 30_000);
+      },
+      error: (err) => {
+        this.generandoExcel.set(null);
+        this.error.set(
+          err?.status === 404
+            ? 'Esa corrida no tiene detalle guardado: sólo se puede regenerar el Excel ' +
+              'de las corridas hechas después de que se empezó a guardarlo.'
+            : 'No se pudo generar el Excel de esa corrida.',
+        );
+      },
+    });
+  }
+
   descartarCorrida(c: Corrida, e: Event): void {
     e.stopPropagation();
     this.api.borrarCorrida(c.id).subscribe({
@@ -754,6 +810,13 @@ export class App {
       if (pasa && pasa[u.j] !== true) continue;
       if (!vistos.has(u.s)) vistos.set(u.s, null);
     }
+    // Y lo que el catálogo respondió a lo que se está escribiendo. Es lo que
+    // permite encontrar un SKU sano POR NOMBRE: su descripción no viaja en la
+    // respuesta, sólo su código. Se agrega al final para no desplazar a los
+    // que sí tuvieron faltante, que son los que suelen buscarse.
+    for (const s of this.sugerenciasCatalogo()) {
+      if (!vistos.get(s.sku)) vistos.set(s.sku, s.descripcion);
+    }
     return [...vistos]
       .map(([sku, descripcion]) => ({
         sku,
@@ -822,6 +885,17 @@ export class App {
   );
 
   // -- opciones de los desplegables, sacadas de los propios datos ----------
+
+  /** La tienda sobre la que corrió este análisis. Es una sola —el motor no
+   *  admite más— y hace falta para preguntarle al catálogo. Se toma del sello
+   *  de la corrida guardada, del formulario, o del propio resultado. */
+  readonly tiendaDelAnalisis = computed(
+    () =>
+      this.resultado()?.guardado?.tienda ||
+      this.tiendaSeleccionada() ||
+      this.tiendas()[0] ||
+      '',
+  );
 
   readonly tiendas = computed(() =>
     [...new Set((this.resultado()?.por_sku_tienda ?? []).map((s) => s.tienda))].sort(),
@@ -1279,6 +1353,7 @@ export class App {
     const previo = this.entradaSku();
     const valor = (e.target as HTMLInputElement).value;
     this.entradaSku.set(valor);
+    this.tecleoSku.next(valor);
     if (this.vinoDeLaLista(e, previo, valor, this.opcionesSku().map((o) => o.etiqueta))) {
       this.confirmarSku();
     }

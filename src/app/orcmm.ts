@@ -491,6 +491,25 @@ export class Orcmm {
     return this.http.get(url, { responseType: 'blob' });
   }
 
+  /** Autocompletar de SKU contra el CATÁLOGO, no contra el resultado.
+   *
+   *  Hace falta por los SKU sanos: `por_sku_tienda` sólo trae los que
+   *  tuvieron faltante, así que los otros dos tercios no se podían buscar por
+   *  nombre. Mandar sus descripciones costaría 552 KB; preguntarlo al
+   *  escribir cuesta cero. */
+  buscarSkus(tienda: string, q: string): Observable<{ sku: string; descripcion: string | null }[]> {
+    return this.http
+      .get<{ skus: { sku: string; descripcion: string | null }[] }>(
+        `${this.base}/skus`, { params: { tienda, q } })
+      .pipe(map((r) => r.skus));
+  }
+
+  /** El Excel de una corrida guardada. Se genera al pedirlo, desde
+   *  `run_dias`: no vuelve a leer fuentes ni a clasificar. */
+  urlExcelCorrida(id: string): string {
+    return `${this.base}/runs/${id}/excel`;
+  }
+
   /** Las corridas ya hechas, lo más reciente primero. Sin el resumen. */
   listarCorridas(limite = 50): Observable<Corrida[]> {
     return this.http
