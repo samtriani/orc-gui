@@ -144,9 +144,7 @@
       <section class="tarjeta">
         <h2>Análisis ya realizados</h2>
         <p class="nota">
-          Resultados guardados. Abrir uno no lo vuelve a calcular: se lee tal cual
-          quedó. La versión del motor va anotada porque las reglas cambian, y dos
-          corridas del mismo periodo con versiones distintas no son comparables.
+          Resultados guardados. Abrir uno no lo vuelve a calcular: se lee tal cual quedó.
         </p>
         <table>
           <thead>
@@ -157,7 +155,10 @@
               <th class="num">Días con faltante</th>
               <th class="num">Venta perdida</th>
               <th>Corrido</th>
+              <!-- Columna Motor: oculta a petición. El sello se sigue guardando
+                   en runs.version_motor; basta descomentar aquí y abajo.
               <th>Motor</th>
+              -->
               <th></th>
             </tr>
           </thead>
@@ -172,7 +173,9 @@
                   {{ c.venta_perdida != null ? ('$' + (c.venta_perdida | number: '1.0-0')) : '—' }}
                 </td>
                 <td>{{ c.corrido_en | date: 'dd/MM/yy HH:mm' }}</td>
+                <!--
                 <td><code>{{ c.version_motor || '—' }}</code></td>
+                -->
                 <td class="acciones">
                   <button
                     class="btn-plano"
