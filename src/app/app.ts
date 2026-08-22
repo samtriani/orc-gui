@@ -1192,6 +1192,16 @@ export class App {
     };
   });
 
+  /** Se buscó un SKU y no tiene un solo día que explicar: o está sano, o
+   *  está fuera del catálogo. Da igual cuál — el análisis de abajo habla del
+   *  periodo completo y no de él, así que enseñarlo invita a leerlo como si
+   *  fuera suyo. El scorecard de proveedor es el peor: no tiene columna de
+   *  SKU, así que se quedaba mostrando los 689 proveedores de la tienda al
+   *  lado de una tarjeta que dice "este producto no tuvo faltantes". */
+  readonly sinNadaQueExplicar = computed(
+    () => !!this.filtroSku().length && this.renglonesDelSku().length === 0,
+  );
+
   /** Se buscó un SKU, no salió en el análisis, y TAMPOCO está en el alcance.
    *
    *  Antes este aviso cubría dos casos —el sano y el fuera de catálogo— y
@@ -1199,10 +1209,7 @@ export class App {
    *  Desde que el sano tiene su propia tarjeta (ver `fichaSano`), aquí sólo
    *  queda el segundo, y ya se puede afirmar cuál es en vez de enumerar. */
   readonly skuFueraDeAlcance = computed(
-    () =>
-      !!this.filtroSku().length &&
-      this.renglonesDelSku().length === 0 &&
-      this.fichaSano() === null,
+    () => this.sinNadaQueExplicar() && this.fichaSano() === null,
   );
 
   // -- paginadores ---------------------------------------------------------

@@ -670,7 +670,7 @@
       </section>
 
       <!-- waterfall: de 100% al OSA real, en puntos -->
-      @if (waterfallFiltrado(); as wf) {
+      @if (!sinNadaQueExplicar() && waterfallFiltrado(); as wf) {
         <section class="tarjeta">
           <!-- "por Volumen" en el título, no sólo en la nota: es lo único que
                distingue esta distribución de la de venta perdida, y las dos
@@ -874,6 +874,7 @@
       }
 
       <!-- pareto -->
+      @if (!sinNadaQueExplicar()) {
       <div class="dos">
         <section class="tarjeta">
           <!-- Decir por qué reparte: el waterfall de arriba reparte puntos de
@@ -942,6 +943,8 @@
         </section>
       </div>
 
+      }
+
       <!-- Detalle de la causa. Va ANTES del proveedor y como tarjeta propia:
            estaba anidada dentro de la de proveedor, que es otro tema —una
            reparte causas raíz, la otra califica a los proveedores— y ahí
@@ -977,7 +980,7 @@
       }
 
       <!-- proveedor -->
-      @if (r.proveedores?.length) {
+      @if (r.proveedores?.length && !sinNadaQueExplicar()) {
         <section class="tarjeta">
           <h2>Cumplimiento del proveedor en CEDIS</h2>
           <p class="nota">
@@ -1036,7 +1039,7 @@
       }
 
       <!-- qué faltó -->
-      @if (r.cobertura!.bloqueos.length) {
+      @if (r.cobertura!.bloqueos.length && !sinNadaQueExplicar()) {
         <section class="tarjeta">
           <h2>¿Qué dato bloqueó la clasificación?</h2>
           <p class="nota">
