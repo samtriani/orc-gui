@@ -812,14 +812,19 @@
         </section>
       }
 
-      <!-- bottom de SKU por impacto -->
+      <!--
+        OCULTO a peticion del cliente (2026-08-22). No se borra: la lista
+        sigue calculandose en bottomSkus() y basta con quitar estos dos
+        comentarios para devolverla.
+
+      [[ bottom de SKU por impacto ]]
       @if (bottomSkus().length) {
         <section class="tarjeta">
           <h2>SKU que menos costaron</h2>
-          <!-- Los 10 de menor venta perdida ENTRE LOS QUE SÍ TUVIERON GAP: un
+          [[ Los 10 de menor venta perdida ENTRE LOS QUE SÍ TUVIERON GAP: un
                SKU que nunca faltó no aparece en la lista, porque no tiene
                nada que explicar. La barra se escala contra este grupo, no
-               contra el top, o todas saldrían invisibles. -->
+               contra el top, o todas saldrían invisibles. ]]
           <p class="nota">
             Los de menor impacto entre los que tuvieron al menos un día con gap.
           </p>
@@ -856,6 +861,7 @@
           </div>
         </section>
       }
+      -->
 
       <!-- de lo general a lo particular: aquí empieza el detalle -->
       @if (faltanDatos().length) {
