@@ -454,6 +454,18 @@
             </select>
           </label>
 
+          @if (vias().length > 1) {
+            <label class="campo">
+              <span>Vía</span>
+              <select (change)="ponVia($event)">
+                <option value="" [selected]="!filtroVia()">Todas</option>
+                @for (v of vias(); track v) {
+                  <option [value]="v" [selected]="v === filtroVia()">{{ v }}</option>
+                }
+              </select>
+            </label>
+          }
+
           <label class="campo">
             <span>Responsable</span>
             <select (change)="ponResponsable($event)">
@@ -530,6 +542,28 @@
                 </div>
               </label>
             }
+          </div>
+        }
+
+        <!-- El SKU buscado no tuvo faltantes, pero SÍ está en el alcance.
+             Antes esto dejaba la pantalla en blanco y parecía que el análisis
+             no lo cubría. En verde, no en ámbar: es un resultado bueno. -->
+        @if (fichaSano(); as s) {
+          <div class="ficha sano">
+            <div class="ficha-cab">
+              <code>{{ s.sku }}</code>
+              <span>
+                {{ s.cuantos > 1 ? s.cuantos + ' SKU sin faltantes' : 'sin faltantes' }}
+              </span>
+            </div>
+            <div class="ficha-datos">
+              <span><b>0</b> días con faltante</span>
+              <span><b>100%</b> de OSA en el periodo</span>
+              <span>Está dentro del alcance: se analizó y no tuvo incidencia.</span>
+            </div>
+            <button class="btn-plano" (click)="verExpediente(s.sku, s.tienda)">
+              Ver evolución diaria
+            </button>
           </div>
         }
 

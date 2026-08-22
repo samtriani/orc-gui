@@ -536,6 +536,10 @@ export class App {
   readonly entradaSku = signal('');
   readonly filtroTienda = signal('');
   readonly filtroCausa = signal('');
+  /** Vía de resurtido. Es la que USÓ el modelo, no la del catálogo: desde que
+   *  los pedidos DSD se leen de COMPRAS, hay SKU marcados "Vía 2" que se
+   *  clasifican por la rama directa. Viene en el catálogo de combos. */
+  readonly filtroVia = signal('');
   readonly filtroResponsable = signal('');
   readonly filtroProveedor = signal<string[]>([]);
   readonly entradaProveedor = signal('');
@@ -590,6 +594,7 @@ export class App {
         this.filtroCausa() ||
         this.filtroResponsable() ||
         this.filtroProveedor().length ||
+        this.filtroVia() ||
         NIVELES.some((n) => this.filtroNivel[n]().length)
       ),
   );
@@ -612,6 +617,18 @@ export class App {
     for (const s of this.resultado()?.por_sku_tienda ?? []) {
       if (pasa && pasa[s.j] !== true) continue;
       if (!vistos.has(s.sku)) vistos.set(s.sku, s.descripcion);
+    }
+    // Y los SANOS: los que están en el alcance y no tuvieron ni un día con
+    // faltante. En Coyoacán son 6,850 de 10,462 —el 65%— y antes no se podían
+    // ni buscar: la caja no los sugería y filtrar por ellos dejaba la
+    // pantalla en blanco, como si el análisis no los cubriera.
+    //
+    // Salen del universo, que ya viaja, así que no cuestan un byte de más.
+    // Van sin descripción porque el universo sólo trae el código: mandar los
+    // 6,850 nombres costaría 552 KB.
+    for (const u of this.resultado()?.detalle_dias?.universo ?? []) {
+      if (pasa && pasa[u.j] !== true) continue;
+      if (!vistos.has(u.s)) vistos.set(u.s, null);
     }
     return [...vistos]
       .map(([sku, descripcion]) => ({
@@ -665,6 +682,13 @@ export class App {
     });
     return opciones;
   });
+
+  /** Las vías presentes en el resultado. Van en la posición 4 del combo,
+   *  después de los cuatro niveles comerciales. */
+  readonly vias = computed(() =>
+    [...new Set(this.combosVivos().map((c) => c[NIVELES.length])
+      .filter((v): v is string => !!v))].sort(),
+  );
 
   /** Si el análisis corrió sin catálogo comercial (modo archivo, o la tabla
    *  todavía sin cargar) estos filtros no tienen nada que ofrecer: el bloque
@@ -735,11 +759,20 @@ export class App {
    */
   private readonly combosQuePasan = computed<boolean[] | null>(() => {
     const puestas = NIVELES.map((n) => this.filtroNivel[n]());
-    if (!puestas.some((p) => p.length)) return null;
+    const via = this.filtroVia();
+    if (!via && !puestas.some((p) => p.length)) return null;
     // Un SKU sin ficha comercial (fuera del catálogo, RC00) cae en el combo
     // de puros nulos y no pertenece a ninguna sección: con un filtro puesto
     // queda fuera, también del denominador del waterfall.
-    return this.combos().map((c) => puestas.every((p, i) => this.coincideAlguna([c[i]], p)));
+    //
+    // La vía va en el mismo arreglo que los niveles a propósito: los
+    // renglones del universo indexan este catálogo, así que filtrar por vía
+    // recompone el denominador del OSA sin código extra.
+    return this.combos().map(
+      (c) =>
+        puestas.every((p, i) => this.coincideAlguna([c[i]], p)) &&
+        (!via || c[NIVELES.length] === via),
+    );
   });
 
   readonly skusFiltrados = computed<FilaSkuTienda[]>(() => {
@@ -1010,6 +1043,36 @@ export class App {
     );
   });
 
+  /** Los SKU del alcance que NO tuvieron ni un día con faltante. Salen del
+   *  universo menos los que traen renglón en `por_sku_tienda`. */
+  private readonly skusSanos = computed(() => {
+    const conFaltante = new Set(
+      (this.resultado()?.por_sku_tienda ?? []).map((s) => s.sku),
+    );
+    const sanos = new Map<string, string>();
+    for (const u of this.resultado()?.detalle_dias?.universo ?? []) {
+      if (!conFaltante.has(u.s)) sanos.set(u.s, u.t);
+    }
+    return sanos;
+  });
+
+  /** Se buscó un SKU, no tiene faltantes, pero SÍ está en el alcance.
+   *
+   *  Sin esto la pantalla se quedaba en blanco y parecía que el análisis no
+   *  cubría el producto. Decirlo es la mitad del valor: "está dentro y su OSA
+   *  fue 100%" es un resultado, no un vacío. */
+  readonly fichaSano = computed(() => {
+    if (this.renglonesDelSku().length) return null;
+    const buscados = this.filtroSku();
+    if (!buscados.length) return null;
+    const sanos = this.skusSanos();
+    const hallados = buscados
+      .map((b) => [...sanos].find(([sku]) => normalizar(sku) === normalizar(b)))
+      .filter((x): x is [string, string] => !!x);
+    if (!hallados.length) return null;
+    return { sku: hallados[0][0], tienda: hallados[0][1], cuantos: hallados.length };
+  });
+
   readonly fichaSku = computed(() => {
     const filas = this.renglonesDelSku();
     if (!filas.length) return null;
@@ -1182,6 +1245,11 @@ export class App {
     this.reiniciarPaginas();
   }
 
+  ponVia(e: Event): void {
+    this.filtroVia.set((e.target as HTMLSelectElement).value);
+    this.reiniciarPaginas();
+  }
+
   ponCausa(e: Event): void {
     this.filtroCausa.set((e.target as HTMLSelectElement).value);
     this.reiniciarPaginas();
@@ -1198,6 +1266,7 @@ export class App {
     this.filtroTienda.set('');
     this.filtroCausa.set('');
     this.filtroResponsable.set('');
+    this.filtroVia.set('');
     this.filtroProveedor.set([]);
     this.entradaProveedor.set('');
     for (const n of NIVELES) {

@@ -742,6 +742,18 @@ tr.fila-mal td {
   padding: 7px 14px;
 }
 
+/* Un SKU sano es buena noticia: verde, no el ámbar del resto de las fichas.
+   Si se pinta igual que un hallazgo, se lee como problema. */
+.ficha.sano {
+  border-color: #a8cfab;
+  background: var(--bien-fondo);
+  color: var(--bien);
+}
+.ficha.sano button {
+  margin-top: 10px;
+  align-self: flex-start;
+}
+
 /* -------- ficha del SKU buscado -------- */
 .ficha {
   margin-top: 14px;
