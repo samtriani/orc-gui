@@ -1192,11 +1192,17 @@ export class App {
     };
   });
 
-  /** Se buscó un SKU y no salió en el análisis. No es un error de búsqueda y
-   *  hay que decir por qué, porque son dos razones muy distintas y ninguna
-   *  significa "no existe". */
-  readonly skuSinFaltantes = computed(
-    () => !!this.filtroSku().length && this.renglonesDelSku().length === 0,
+  /** Se buscó un SKU, no salió en el análisis, y TAMPOCO está en el alcance.
+   *
+   *  Antes este aviso cubría dos casos —el sano y el fuera de catálogo— y
+   *  tenía que pedirle al usuario que corriera un script para distinguirlos.
+   *  Desde que el sano tiene su propia tarjeta (ver `fichaSano`), aquí sólo
+   *  queda el segundo, y ya se puede afirmar cuál es en vez de enumerar. */
+  readonly skuFueraDeAlcance = computed(
+    () =>
+      !!this.filtroSku().length &&
+      this.renglonesDelSku().length === 0 &&
+      this.fichaSano() === null,
   );
 
   // -- paginadores ---------------------------------------------------------

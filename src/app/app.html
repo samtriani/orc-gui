@@ -653,20 +653,17 @@
           </div>
         }
 
-        @if (skuSinFaltantes()) {
+        @if (skuFueraDeAlcance()) {
           <div class="ficha vacia">
-            <b>{{ filtroSku().length > 1 ? 'Esos SKU no aparecen' : 'Ese SKU no aparece' }} en el análisis.</b>
+            <b>
+              {{ filtroSku().length > 1 ? 'Esos SKU no están' : 'Ese SKU no está' }} en el
+              catálogo de la tienda.
+            </b>
             <p>
-              Sólo puede ser por dos razones, y ninguna es que no exista: o
-              <b>no tuvo un solo día con faltante</b> en el periodo —está sano y BOPS nunca lo
-              reportó, que es de donde arranca todo el análisis—, o su SKU
-              <b>no está en el catálogo de la tienda</b> y quedó fuera del alcance junto con los
-              otros {{ r.cobertura!.casos_fuera_de_alcance | number }} días.
-            </p>
-            <p class="pista">
-              Para distinguir cuál de las dos es, y ver su inventario y venta día por día, hay que
-              correr <code>orcmm_expediente.py</code> en el backend: ese detalle no viaja en esta
-              respuesta.
+              Queda fuera del alcance junto con los otros
+              {{ r.cobertura!.casos_fuera_de_alcance | number }} días: es de una división que
+              este análisis no cubre. No es que no exista ni que le falte información — no le
+              tocaba explicarlo.
             </p>
           </div>
         }
