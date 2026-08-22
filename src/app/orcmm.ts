@@ -310,6 +310,18 @@ export interface Analisis {
    *  cada SKU y de cada renglón del universo. Llega vacío —o con un solo
    *  combo de nulos— si el análisis corrió sin catálogo comercial. */
   jerarquia?: (string | null)[][];
+
+  /** Sólo cuando el resumen se leyó del histórico. Sirve para que la pantalla
+   *  diga que esto no se acaba de calcular, y con qué versión del motor se
+   *  hizo — un resultado de hace un mes puede no coincidir con lo que daría
+   *  el motor de hoy. */
+  guardado?: {
+    tienda: string;
+    desde: string;
+    hasta: string;
+    version_motor: string | null;
+    corrido_en: string;
+  };
   proveedores?: FilaProveedor[];
   citas_falladas?: CitaFallada[];
   discrepancias?: { folio: string; sku: string; motivos: string }[];
@@ -323,6 +335,31 @@ interface Encolado {
 }
 
 /** Una fila de GET /api/tiendas — tiendas con datos ya cargados en Postgres. */
+/**
+ * Un análisis ya corrido y guardado.
+ *
+ * Es el renglón de la pantalla inicial, sin el resumen: ése pesa ~5 MB y aquí
+ * sólo se pintan las cifras de portada. El detalle se pide aparte al abrirlo.
+ */
+export interface Corrida {
+  id: string;
+  tienda: string;
+  desde: string;
+  hasta: string;
+  umbral_osa: number;
+  /** El commit del motor que la produjo. Dos corridas del mismo periodo con
+   *  versiones distintas NO son comparables: las reglas cambian. */
+  version_motor: string | null;
+  osa_alcance: number | null;
+  dias_faltante: number | null;
+  venta_perdida: number | null;
+  cobertura_pct: number | null;
+  corrido_en: string;
+  segundos: number | null;
+  origen: string;
+  archivo: string | null;
+}
+
 export interface Tienda {
   tienda: string;
   nombre: string | null;
@@ -445,6 +482,23 @@ export class Orcmm {
     return this.http.delete<{ libero_el_turno: boolean; detalle: string }>(
       `${this.base}/analizar/${id}`,
     );
+  }
+
+  /** Las corridas ya hechas, lo más reciente primero. Sin el resumen. */
+  listarCorridas(limite = 50): Observable<Corrida[]> {
+    return this.http
+      .get<{ runs: Corrida[] }>(`${this.base}/runs`, { params: { limite } })
+      .pipe(map((r) => r.runs));
+  }
+
+  /** El resumen guardado de una corrida, listo para pintar. Mismo cuerpo que
+   *  el de un análisis recién hecho, más el bloque `guardado`. */
+  leerCorrida(id: string): Observable<Analisis> {
+    return this.http.get<Analisis>(`${this.base}/runs/${id}`);
+  }
+
+  borrarCorrida(id: string): Observable<unknown> {
+    return this.http.delete(`${this.base}/runs/${id}`);
   }
 
   /** Tiendas con datos ya cargados en Postgres, para el selector de "elegir

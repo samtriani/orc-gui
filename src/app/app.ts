@@ -1,9 +1,10 @@
-import { DecimalPipe, PercentPipe, SlicePipe } from '@angular/common';
+import { DatePipe, DecimalPipe, PercentPipe, SlicePipe } from '@angular/common';
 import { Component, ElementRef, WritableSignal, computed, inject, signal,
          viewChildren } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Analisis, CitaFallada, Expediente, FilaCausa, FilaProveedor, FilaResponsable,
-         FilaSkuTienda, FilaSubcausa, Orcmm, Tienda, Waterfall } from './orcmm';
+import { Analisis, CitaFallada, Corrida, Expediente, FilaCausa, FilaProveedor,
+         FilaResponsable, FilaSkuTienda, FilaSubcausa, Orcmm, Tienda,
+         Waterfall } from './orcmm';
 import { Paginador, PaginadorCtrl } from './paginacion';
 
 /** Comparación laxa para los filtros de texto: sin acentos, sin mayúsculas y
@@ -124,12 +125,20 @@ const COLOR_CAUSA_TIRA: Record<string, string> = {
 
 @Component({
   selector: 'app-root',
-  imports: [DecimalPipe, PercentPipe, SlicePipe, PaginadorCtrl],
+  imports: [DatePipe, DecimalPipe, PercentPipe, SlicePipe, PaginadorCtrl],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
 export class App {
   private readonly api = inject(Orcmm);
+
+  constructor() {
+    // El histórico y los nombres de tienda se piden al entrar: la pantalla
+    // inicial es la lista de corridas, y sin los nombres los renglones sólo
+    // dirían "Tienda 287".
+    this.cargarCorridas();
+    this.asegurarNombresDeTienda();
+  }
 
   readonly paso = signal<Paso>('inicio');
   readonly archivos = signal<File[]>([]);
@@ -154,6 +163,13 @@ export class App {
   readonly modo = signal<Modo>('archivo');
   readonly tiendasDisponibles = signal<Tienda[]>([]);
   readonly cargandoTiendas = signal(false);
+
+  /** El histórico de corridas. Una corrida completa tarda ~5.7 minutos, así
+   *  que volver a ver una ya hecha tiene que ser instantáneo: se lee de la
+   *  tabla `runs` en vez de recalcularla. */
+  readonly corridas = signal<Corrida[]>([]);
+  readonly cargandoCorridas = signal(false);
+  readonly abriendoCorrida = signal<string | null>(null);
   /** Obligatoria y de selección única: el análisis siempre corre sobre
    *  exactamente esta tienda, nunca "todas" ni varias a la vez. */
   readonly tiendaSeleccionada = signal('');
@@ -369,6 +385,9 @@ export class App {
   }
 
   reiniciar(): void {
+    // Al volver al inicio se refresca el histórico: puede traer la corrida
+    // que se acaba de hacer, o una que corrió alguien más mientras tanto.
+    this.cargarCorridas();
     this.archivos.set([]);
     this.resultado.set(null);
     this.error.set(null);
@@ -382,6 +401,56 @@ export class App {
     // 'modo' no se reinicia a propósito: si el usuario ya estaba en "elegir
     // tienda y periodo", tiene más sentido que se quede ahí que forzarlo de
     // vuelta a "subir archivo".
+  }
+
+  // -- histórico de corridas ------------------------------------------------
+
+  /** Se pide al entrar y después de cada análisis. En silencio: si el
+   *  histórico no responde, la pantalla sigue sirviendo para correr uno
+   *  nuevo — no vale la pena bloquearla por un listado. */
+  private cargarCorridas(): void {
+    this.cargandoCorridas.set(true);
+    this.api.listarCorridas().subscribe({
+      next: (cs) => {
+        this.corridas.set(cs);
+        this.cargandoCorridas.set(false);
+      },
+      error: () => this.cargandoCorridas.set(false),
+    });
+  }
+
+  /** Abre una corrida guardada. No recalcula nada: trae el mismo resumen que
+   *  produjo el análisis original y lo pinta. */
+  abrirCorrida(c: Corrida): void {
+    this.abriendoCorrida.set(c.id);
+    this.error.set(null);
+    this.api.leerCorrida(c.id).subscribe({
+      next: (a) => {
+        this.abriendoCorrida.set(null);
+        this.limpiarFiltros();
+        this.resultado.set(a);
+        this.paso.set('listo');
+        this.asegurarNombresDeTienda();
+        window.scrollTo({ top: 0 });
+      },
+      error: () => {
+        this.abriendoCorrida.set(null);
+        this.error.set('No se pudo abrir esa corrida. Puede que la hayan borrado.');
+      },
+    });
+  }
+
+  descartarCorrida(c: Corrida, e: Event): void {
+    e.stopPropagation();
+    this.api.borrarCorrida(c.id).subscribe({
+      next: () => this.corridas.update((cs) => cs.filter((x) => x.id !== c.id)),
+      error: () => this.error.set('No se pudo borrar esa corrida.'),
+    });
+  }
+
+  etiquetaCorrida(c: Corrida): string {
+    const t = this.nombrePorTienda().get(c.tienda);
+    return t ? `${c.tienda} · ${t}` : `Tienda ${c.tienda}`;
   }
 
   // -- analizar desde la base de datos (tienda + periodo) -------------------

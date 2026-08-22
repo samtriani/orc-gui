@@ -137,6 +137,61 @@
     @if (error(); as e) {
       <p class="aviso mal">{{ e }}</p>
     }
+
+    <!-- Histórico. Una corrida completa tarda ~5.7 minutos, así que volver a
+         una ya hecha no debe costar nada: se lee lo guardado y se pinta. -->
+    @if (corridas().length) {
+      <section class="tarjeta">
+        <h2>Análisis ya realizados</h2>
+        <p class="nota">
+          Resultados guardados. Abrir uno no lo vuelve a calcular: se lee tal cual
+          quedó. La versión del motor va anotada porque las reglas cambian, y dos
+          corridas del mismo periodo con versiones distintas no son comparables.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Tienda</th>
+              <th>Periodo</th>
+              <th class="num">OSA</th>
+              <th class="num">Días con faltante</th>
+              <th class="num">Venta perdida</th>
+              <th>Corrido</th>
+              <th>Motor</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of corridas(); track c.id) {
+              <tr>
+                <td>{{ etiquetaCorrida(c) }}</td>
+                <td>{{ c.desde }} → {{ c.hasta }}</td>
+                <td class="num">{{ c.osa_alcance != null ? (c.osa_alcance + '%') : '—' }}</td>
+                <td class="num">{{ c.dias_faltante | number }}</td>
+                <td class="num">
+                  {{ c.venta_perdida != null ? ('$' + (c.venta_perdida | number: '1.0-0')) : '—' }}
+                </td>
+                <td>{{ c.corrido_en | date: 'dd/MM/yy HH:mm' }}</td>
+                <td><code>{{ c.version_motor || '—' }}</code></td>
+                <td class="acciones">
+                  <button
+                    class="btn-plano"
+                    [disabled]="abriendoCorrida() === c.id"
+                    (click)="abrirCorrida(c)"
+                  >
+                    {{ abriendoCorrida() === c.id ? 'Abriendo…' : 'Ver detalle' }}
+                  </button>
+                  <button class="btn-plano quitar" (click)="descartarCorrida(c, $event)"
+                          title="Quitar del histórico">×</button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </section>
+    } @else if (cargandoCorridas()) {
+      <p class="nota">Cargando el histórico de corridas…</p>
+    }
   }
 
   <!-- ========================== TRABAJANDO ========================== -->
