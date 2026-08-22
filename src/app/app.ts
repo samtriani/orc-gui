@@ -830,32 +830,43 @@ export class App {
     // Sección, aquí sólo se sugieren cervezas. Al revés no —elegir un SKU no
     // acota las secciones— porque el SKU es lo más particular que hay: el
     // resto de los niveles quedarían con un solo valor cada uno.
+    const etiquetar = (sku: string, descripcion: string | null) => ({
+      sku,
+      descripcion,
+      etiqueta: descripcion ? `${sku} — ${descripcion}` : sku,
+    });
+
+    // 1. Lo que el catálogo acaba de responder, EN EL ORDEN EN QUE VINO.
+    //
+    //    Viene rankeado por relevancia desde el backend —cuántas palabras
+    //    empatan en el nombre, y a igualdad el nombre más corto—. Antes esto
+    //    se mezclaba con todo lo demás y se reordenaba por código, lo que
+    //    tiraba ese trabajo: buscando "bonafont 750 ml" salía primero un
+    //    "AGUA SABOR FRESA LEVITE BONAFONT 600 ML" nada más porque su código
+    //    empieza con 75030 y el del bueno con 75810.
+    //
+    //    Los SKU sanos entran por aquí y sólo por aquí: volcarlos todos desde
+    //    el universo llenaba el desplegable de miles de códigos sin nombre.
+    const opciones = this.sugerenciasCatalogo().map((s) => etiquetar(s.sku, s.descripcion));
+    const vistos = new Set(opciones.map((o) => o.sku));
+
+    // 2. Y después los del resultado, por código. Éstos son la lista que se
+    //    puede recorrer sin escribir nada.
     const pasa = this.combosQuePasan();
-    const vistos = new Map<string, string | null>();
+    const delResultado = new Map<string, string | null>();
     for (const s of this.resultado()?.por_sku_tienda ?? []) {
       if (pasa && pasa[s.j] !== true) continue;
-      if (!vistos.has(s.sku)) vistos.set(s.sku, s.descripcion);
+      if (!vistos.has(s.sku) && !delResultado.has(s.sku)) {
+        delResultado.set(s.sku, s.descripcion ?? this.nombresDelCatalogo().get(s.sku) ?? null);
+      }
     }
-    // Los SKU SANOS no se vuelcan aquí, aunque saldrían gratis del universo.
-    // Se intentó y fue peor: son 6,930 de 10,454 y el universo sólo trae el
-    // código, así que el desplegable quedaba con miles de números pelones,
-    // imposible de recorrer. Para encontrarlos está el buscador de catálogo,
-    // que los trae CON nombre y sólo los que empatan con lo escrito.
-    for (const s of this.sugerenciasCatalogo()) {
-      if (!vistos.get(s.sku)) vistos.set(s.sku, s.descripcion);
-    }
-    // Y los ya buscados antes, para que su nombre no se pierda al confirmar
-    // la ficha —la caja se vacía y la búsqueda siguiente devuelve otra cosa—.
-    for (const [sku, desc] of this.nombresDelCatalogo()) {
-      if (!vistos.get(sku)) vistos.set(sku, desc);
-    }
-    return [...vistos]
-      .map(([sku, descripcion]) => ({
-        sku,
-        descripcion,
-        etiqueta: descripcion ? `${sku} — ${descripcion}` : sku,
-      }))
-      .sort((a, b) => a.sku.localeCompare(b.sku));
+
+    return [
+      ...opciones,
+      ...[...delResultado]
+        .map(([sku, d]) => etiquetar(sku, d))
+        .sort((a, b) => a.sku.localeCompare(b.sku)),
+    ];
   });
 
   readonly proveedoresDisponibles = computed(() =>
