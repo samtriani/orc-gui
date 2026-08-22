@@ -163,12 +163,32 @@ export class App {
         distinctUntilChanged(),
         switchMap((q) => {
           const t = this.tiendaDelAnalisis();
-          if (!t || q.trim().length < 2) return of([]);
-          return this.api.buscarSkus(t, q.trim()).pipe(catchError(() => of([])));
+          if (q.trim().length < 2) {
+            this.avisoBusqueda.set(null);
+            return of([]);
+          }
+          if (!t) {
+            this.avisoBusqueda.set('No se sabe en qué tienda buscar.');
+            return of([]);
+          }
+          return this.api.buscarSkus(t, q.trim()).pipe(
+            // El error NO se traga: tragárselo hacía que "no trae nada" y "el
+            // endpoint no existe" se vieran exactamente igual, y no había
+            // forma de distinguirlos desde la pantalla.
+            catchError((e) => {
+              this.avisoBusqueda.set(
+                e?.status === 404
+                  ? 'La API no tiene el buscador de catálogo todavía.'
+                  : `No se pudo buscar en el catálogo (${e?.status ?? 'sin respuesta'}).`,
+              );
+              return of([]);
+            }),
+          );
         }),
         takeUntilDestroyed(),
       )
       .subscribe((skus) => {
+        if (skus.length) this.avisoBusqueda.set(null);
         this.sugerenciasCatalogo.set(skus);
         // Y se recuerdan. Las sugerencias se reemplazan en cada búsqueda,
         // pero la descripción de un SKU ya visto sigue haciendo falta
@@ -192,6 +212,8 @@ export class App {
     signal<{ sku: string; descripcion: string | null }[]>([]);
   /** Código -> nombre, acumulado de todo lo que el catálogo ha respondido. */
   private readonly nombresDelCatalogo = signal(new Map<string, string>());
+  /** Por qué el buscador no trajo nada, cuando la razón no es que no haya. */
+  readonly avisoBusqueda = signal<string | null>(null);
 
   readonly paso = signal<Paso>('inicio');
   readonly archivos = signal<File[]>([]);

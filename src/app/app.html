@@ -493,6 +493,9 @@
                 (input)="ponEntradaSku($event)"
                 (keydown)="agregarSku($event)"
               />
+              @if (avisoBusqueda(); as a) {
+                <span class="pista mal">{{ a }}</span>
+              }
               <datalist id="lista-skus">
                 @for (o of opcionesSku(); track o.sku) {
                   <option [value]="o.etiqueta"></option>
