@@ -484,6 +484,13 @@ export class Orcmm {
     );
   }
 
+  /** El Excel, como blob. Se pide con XHR en vez de con un <a href> para
+   *  poder distinguir "todavía se está generando" (409) de "ya no existe"
+   *  (404): con el enlace directo, las dos cosas se veían igual de mal. */
+  descargar(url: string): Observable<Blob> {
+    return this.http.get(url, { responseType: 'blob' });
+  }
+
   /** Las corridas ya hechas, lo más reciente primero. Sin el resumen. */
   listarCorridas(limite = 50): Observable<Corrida[]> {
     return this.http

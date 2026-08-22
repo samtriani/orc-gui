@@ -205,6 +205,41 @@ export class App {
     return r?.estado === 'ok' ? this.api.urlDescarga(r.id) : null;
   });
 
+  /** El Excel se escribe DESPUÉS de servir el resultado, así que hay unos
+   *  minutos en que la pantalla ya está y el archivo todavía no. Un `<a
+   *  href>` a secas mostraba un 404 crudo en esa ventana; aquí se pide, y si
+   *  el backend responde 409 se dice que va en camino. */
+  readonly bajando = signal(false);
+  readonly avisoDescarga = signal<string | null>(null);
+
+  descargarExcel(e: Event): void {
+    e.preventDefault();
+    const url = this.urlDescarga();
+    if (!url || this.bajando()) return;
+    this.bajando.set(true);
+    this.avisoDescarga.set(null);
+    this.api.descargar(url).subscribe({
+      next: (blob) => {
+        this.bajando.set(false);
+        const enlace = document.createElement('a');
+        enlace.href = URL.createObjectURL(blob);
+        enlace.download = this.resultado()?.nombre_salida || 'resultado.xlsx';
+        enlace.click();
+        // Sin esto el blob se queda en memoria toda la sesión, y son 16 MB.
+        setTimeout(() => URL.revokeObjectURL(enlace.href), 30_000);
+      },
+      error: (err) => {
+        this.bajando.set(false);
+        this.avisoDescarga.set(
+          err?.status === 409
+            ? 'El Excel todavía se está generando. Son unos minutos: las cifras de ' +
+              'la pantalla ya son las definitivas, el archivo va detrás.'
+            : 'No se pudo descargar el Excel.',
+        );
+      },
+    });
+  }
+
   // -- avisos, filtrados por el interruptor de SIMA ------------------------
   //
   // El backend manda todo; aquí sólo se decide qué se enseña. Así el día que

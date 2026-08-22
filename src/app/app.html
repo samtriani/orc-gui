@@ -416,12 +416,20 @@
             </span>
           </div>
         }
-        <a class="cifra descarga" [href]="urlDescarga()" download>
+        <!-- Se pide con XHR, no con el enlace directo: el Excel se escribe
+             después de servir el resultado, y hay unos minutos en que la
+             pantalla ya está y el archivo no. Así se distingue "va en camino"
+             de "ya no existe" en vez de mostrar un 404 crudo. -->
+        <a class="cifra descarga" [href]="urlDescarga()" (click)="descargarExcel($event)">
           <span class="etiqueta">Excel de resultados</span>
-          <strong>Descargar</strong>
+          <strong>{{ bajando() ? 'Preparando…' : 'Descargar' }}</strong>
           <span class="pie">5 hojas · {{ r.nombre_salida }}</span>
         </a>
       </section>
+
+      @if (avisoDescarga(); as a) {
+        <p class="aviso medio">{{ a }}</p>
+      }
 
       @if (hayFueraDeAlcance()) {
         <p class="aviso medio">
