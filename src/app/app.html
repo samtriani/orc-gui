@@ -427,15 +427,21 @@
             </span>
           </div>
         }
-        <!-- Se pide con XHR y no con el enlace directo: el Excel se escribe
-             después de servir el resultado, así que hay un rato en que la
-             pantalla ya está y el archivo no. Así se distingue "va en camino"
-             de "ya no existe" en vez de mostrar un 404 crudo. -->
+        <!--
+          FUERA de la portada: el Excel se baja desde el historico, que es
+          donde ya hay un boton y donde vive cualquier corrida, no solo la
+          recien hecha. Aqui la tarjeta no aportaba senal —cambiaba a
+          "Preparando..." y nada mas— y le robaba el renglon a las cifras,
+          que son lo que se lee de un vistazo.
+
+          El metodo descargarExcel() y urlDescarga() siguen ahi.
+
         <a class="cifra descarga" [href]="urlDescarga()" (click)="descargarExcel($event)">
           <span class="etiqueta">Excel de resultados</span>
           <strong>{{ bajando() ? 'Preparando…' : 'Descargar' }}</strong>
           <span class="pie">5 hojas · {{ r.nombre_salida }}</span>
         </a>
+        -->
       </section>
 
       @if (avisoDescarga(); as a) {
