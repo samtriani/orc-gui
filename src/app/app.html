@@ -623,6 +623,9 @@
           <div class="ficha sano">
             <div class="ficha-cab">
               <code>{{ s.sku }}</code>
+              @if (s.descripcion) {
+                <b>{{ s.descripcion }}</b>
+              }
               <span>
                 {{ s.cuantos > 1 ? s.cuantos + ' SKU sin faltantes' : 'sin faltantes' }}
               </span>

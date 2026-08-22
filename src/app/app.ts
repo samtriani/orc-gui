@@ -168,7 +168,21 @@ export class App {
         }),
         takeUntilDestroyed(),
       )
-      .subscribe((skus) => this.sugerenciasCatalogo.set(skus));
+      .subscribe((skus) => {
+        this.sugerenciasCatalogo.set(skus);
+        // Y se recuerdan. Las sugerencias se reemplazan en cada búsqueda,
+        // pero la descripción de un SKU ya visto sigue haciendo falta
+        // después: al confirmar la ficha, la caja se vacía y la búsqueda
+        // siguiente devuelve otra cosa — y el nombre desaparecía justo
+        // cuando el usuario ya lo tenía seleccionado.
+        if (skus.length) {
+          this.nombresDelCatalogo.update((m) => {
+            const n = new Map(m);
+            for (const s of skus) if (s.descripcion) n.set(s.sku, s.descripcion);
+            return n;
+          });
+        }
+      });
   }
 
   private readonly tecleoSku = new Subject<string>();
@@ -176,6 +190,8 @@ export class App {
    *  las opciones que salen del resultado. */
   private readonly sugerenciasCatalogo =
     signal<{ sku: string; descripcion: string | null }[]>([]);
+  /** Código -> nombre, acumulado de todo lo que el catálogo ha respondido. */
+  private readonly nombresDelCatalogo = signal(new Map<string, string>());
 
   readonly paso = signal<Paso>('inicio');
   readonly archivos = signal<File[]>([]);
@@ -814,6 +830,9 @@ export class App {
     // permite encontrar un SKU sano POR NOMBRE: su descripción no viaja en la
     // respuesta, sólo su código. Se agrega al final para no desplazar a los
     // que sí tuvieron faltante, que son los que suelen buscarse.
+    for (const [sku, desc] of this.nombresDelCatalogo()) {
+      if (vistos.has(sku) && !vistos.get(sku)) vistos.set(sku, desc);
+    }
     for (const s of this.sugerenciasCatalogo()) {
       if (!vistos.get(s.sku)) vistos.set(s.sku, s.descripcion);
     }
@@ -1081,8 +1100,10 @@ export class App {
     return m;
   });
 
-  private descripcionDe(sku: string): string | null {
-    return this.descripcionPorSku().get(sku) ?? null;
+  /** El nombre del producto. Sale del resultado si el SKU tuvo faltante, y
+   *  del catálogo si está sano: `por_sku_tienda` sólo trae los primeros. */
+  descripcionDe(sku: string): string | null {
+    return this.descripcionPorSku().get(sku) ?? this.nombresDelCatalogo().get(sku) ?? null;
   }
 
   /** Las filas de BOPS del alcance que quedan bajo el filtro de SKU/tienda.
@@ -1268,7 +1289,8 @@ export class App {
       .map((b) => [...sanos].find(([sku]) => normalizar(sku) === normalizar(b)))
       .filter((x): x is [string, string] => !!x);
     if (!hallados.length) return null;
-    return { sku: hallados[0][0], tienda: hallados[0][1], cuantos: hallados.length };
+    const [sku, tienda] = hallados[0];
+    return { sku, tienda, cuantos: hallados.length, descripcion: this.descripcionDe(sku) };
   });
 
   readonly fichaSku = computed(() => {
