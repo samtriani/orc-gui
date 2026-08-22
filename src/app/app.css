@@ -269,10 +269,26 @@ details summary {
 
 /* ------------------------------- cifras -------------------------------- */
 
+/* Tres por renglón, no auto-fit. Con auto-fit las seis cifras se acomodaban
+   en una sola fila apretada de 190 px, y son los números de portada: se leen
+   de un vistazo o no sirven. Si alguna no aplica —fill rate, nivel de
+   servicio— quedan cuatro o cinco y la rejilla se acomoda igual. */
 .cifras {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
+}
+
+@media (max-width: 900px) {
+  .cifras {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .cifras {
+    grid-template-columns: 1fr;
+  }
 }
 
 .cifra {
