@@ -836,27 +836,18 @@ export class App {
       if (pasa && pasa[s.j] !== true) continue;
       if (!vistos.has(s.sku)) vistos.set(s.sku, s.descripcion);
     }
-    // Y los SANOS: los que están en el alcance y no tuvieron ni un día con
-    // faltante. En Coyoacán son 6,850 de 10,462 —el 65%— y antes no se podían
-    // ni buscar: la caja no los sugería y filtrar por ellos dejaba la
-    // pantalla en blanco, como si el análisis no los cubriera.
-    //
-    // Salen del universo, que ya viaja, así que no cuestan un byte de más.
-    // Van sin descripción porque el universo sólo trae el código: mandar los
-    // 6,850 nombres costaría 552 KB.
-    for (const u of this.resultado()?.detalle_dias?.universo ?? []) {
-      if (pasa && pasa[u.j] !== true) continue;
-      if (!vistos.has(u.s)) vistos.set(u.s, null);
-    }
-    // Y lo que el catálogo respondió a lo que se está escribiendo. Es lo que
-    // permite encontrar un SKU sano POR NOMBRE: su descripción no viaja en la
-    // respuesta, sólo su código. Se agrega al final para no desplazar a los
-    // que sí tuvieron faltante, que son los que suelen buscarse.
-    for (const [sku, desc] of this.nombresDelCatalogo()) {
-      if (vistos.has(sku) && !vistos.get(sku)) vistos.set(sku, desc);
-    }
+    // Los SKU SANOS no se vuelcan aquí, aunque saldrían gratis del universo.
+    // Se intentó y fue peor: son 6,930 de 10,454 y el universo sólo trae el
+    // código, así que el desplegable quedaba con miles de números pelones,
+    // imposible de recorrer. Para encontrarlos está el buscador de catálogo,
+    // que los trae CON nombre y sólo los que empatan con lo escrito.
     for (const s of this.sugerenciasCatalogo()) {
       if (!vistos.get(s.sku)) vistos.set(s.sku, s.descripcion);
+    }
+    // Y los ya buscados antes, para que su nombre no se pierda al confirmar
+    // la ficha —la caja se vacía y la búsqueda siguiente devuelve otra cosa—.
+    for (const [sku, desc] of this.nombresDelCatalogo()) {
+      if (!vistos.get(sku)) vistos.set(sku, desc);
     }
     return [...vistos]
       .map(([sku, descripcion]) => ({
