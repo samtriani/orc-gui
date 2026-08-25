@@ -716,17 +716,28 @@
               <span class="agua-barra"></span>
               <span class="agua-val">{{ wf.osa_real ?? "—" }}%</span>
             </div>
+            <!-- La taxonomía va completa, incluidas las causas en cero: que
+                 una no aparezca no se distingue de que no haya ocurrido, y
+                 entre tiendas la gráfica cambiaba de renglones. El cero se
+                 atenúa para que no compita con las que sí pesan. -->
             @for (e of wf.escalones; track e.root_cause_id) {
-              <div class="agua-fila">
-                <span class="agua-eti" [title]="e.responsable">
+              <div class="agua-fila" [class.sin-impacto]="!e.dias">
+                <span class="agua-eti" [title]="e.responsable || 'Sin días en el periodo'">
                   {{ e.root_cause_id }} · {{ e.causa }}
                 </span>
                 <span class="agua-barra">
-                  <i [style.width]="anchoEscalon(e.puntos_osa)" class="recuperable"></i>
+                  @if (e.dias) {
+                    <i [style.width]="anchoEscalon(e.puntos_osa)" class="recuperable"></i>
+                  }
                 </span>
                 <span class="agua-val">
-                  +{{ e.puntos_osa | number: '1.2-2' }} pp
-                  <small>{{ e.dias | number }} días</small>
+                  @if (e.dias) {
+                    +{{ e.puntos_osa | number: '1.2-2' }} pp
+                    <small>{{ e.dias | number }} días</small>
+                  } @else {
+                    —
+                    <small>sin días</small>
+                  }
                 </span>
               </div>
             }

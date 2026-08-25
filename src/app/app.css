@@ -1170,3 +1170,14 @@ a.descarga::before { background: var(--acento) !important; }
   font-weight: 400;
   color: var(--tinta-suave);
 }
+
+/* Causa de la taxonomía que no ocurrió en el periodo. Se muestra igual —que
+   no aparezca no se distingue de que no haya pasado— pero atenuada, para que
+   no compita visualmente con las que sí quitaron puntos de OSA. */
+.agua-fila.sin-impacto {
+  opacity: 0.45;
+}
+
+.agua-fila.sin-impacto .agua-val {
+  font-weight: 400;
+}
