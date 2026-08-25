@@ -1080,8 +1080,9 @@
         </section>
       }
 
-      <!-- qué faltó -->
-      @if (r.cobertura!.bloqueos.length && !sinNadaQueExplicar()) {
+      <!-- qué faltó. Apagada con MOSTRAR_BLOQUEOS: el maquetado se queda
+           para poder volver a prenderla sin rehacerlo. -->
+      @if (mostrarBloqueos && r.cobertura!.bloqueos.length && !sinNadaQueExplicar()) {
         <section class="tarjeta">
           <h2>¿Qué dato bloqueó la clasificación?</h2>
           <p class="nota">
@@ -1321,7 +1322,17 @@
               <button class="btn-plano" (click)="cerrarExpediente()">Cerrar</button>
             </div>
             <p class="nota">
-              Tienda {{ ex.tienda }} · {{ ex.desde }} a {{ ex.hasta }} — mismo motor que clasifica
+              {{ ex.tienda_nombre || 'Tienda ' + ex.tienda }}
+              @if (ex.tienda_nombre) {
+                <span class="clave-tienda">({{ ex.tienda }})</span>
+              }
+              <!-- La vía decide si se dibuja la fila de CEDIS: sólo en Vía 1
+                   resguarda inventario. Va sin explicación al lado — quien lee
+                   esto ya sabe qué es cada vía. -->
+              @if (ex.via_resurtido; as v) {
+                · <b class="via-chip">{{ v }}</b>
+              }
+              · {{ ex.desde }} a {{ ex.hasta }} — mismo motor que clasifica
               el análisis completo, día por día.
             </p>
 
@@ -1330,7 +1341,9 @@
             <div class="leyenda">
               <span><i style="background: var(--s1)"></i>Inventario tienda</span>
               <span><i style="background: var(--s3)"></i>Venta del día</span>
-              <span><i style="background: var(--s2)"></i>Inventario CEDIS</span>
+              @if (hayInventarioCedis()) {
+                <span><i style="background: var(--s2)"></i>Inventario CEDIS</span>
+              }
               <span><i style="background: var(--linea)"></i>PT pedido tienda · CD CEDIS · PV proveedor</span>
             </div>
 

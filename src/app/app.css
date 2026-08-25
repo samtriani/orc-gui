@@ -1181,3 +1181,21 @@ a.descarga::before { background: var(--acento) !important; }
 .agua-fila.sin-impacto .agua-val {
   font-weight: 400;
 }
+
+/* La vía en el encabezado del expediente. Va destacada porque decide cómo se
+   lee la gráfica —si hay fila de CEDIS o no— y la nota de al lado dice qué
+   significa, para no obligar a recordar la diferencia entre Vía 1 y Vía 2. */
+.via-chip {
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: var(--acento-suave);
+  color: var(--acento-oscuro);
+}
+
+
+/* La clave de tienda al lado del nombre: se conserva porque es con lo que se
+   filtra y se busca en los otros sistemas, pero atenuada — quien lee el
+   reporte reconoce el nombre, no el número. */
+.clave-tienda {
+  color: var(--tinta-suave);
+}

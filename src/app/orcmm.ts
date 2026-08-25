@@ -394,7 +394,16 @@ export interface DiaExpediente {
 export interface Expediente {
   sku: string;
   tienda: string;
+  /** Nombre comercial de la tienda: la clave sola no identifica nada. */
+  tienda_nombre: string | null;
   descripcion: string | null;
+  /** Vía de resurtido del SKU en esa tienda: "Vía 1", "Vía 2" o "DSD". */
+  via_resurtido: string | null;
+  /** ¿El CEDIS resguarda producto de este SKU? Sólo en Vía 1. En Vía 2 hace
+   *  crossdock —recibe y despacha el mismo día— así que su existencia es cero
+   *  por diseño y graficarla hace creer que está desabastecido. La decide el
+   *  backend porque es semántica de la vía, no una preferencia de dibujo. */
+  cedis_resguarda: boolean;
   desde: string;
   hasta: string;
   dias: DiaExpediente[];

@@ -70,6 +70,20 @@ const OCULTAR_AVISOS_SIMA = true;
  * rehacerlo. Ver `diasDeHistoria()` y `rangoHistoria()`, que son los que
  * arman el aviso.
  */
+/**
+ * INTERRUPTOR — la tabla "¿Qué dato bloqueó la clasificación?".
+ *
+ * Apagada a petición. Lista los campos que impidieron dictaminar un día y
+ * cuánta venta perdida arrastra cada uno; sirve para priorizar qué fuente
+ * integrar primero, no para leer el resultado del negocio.
+ *
+ * Se apaga con la constante y NO se borra el maquetado: sigue compilando,
+ * así que volver a prenderla es cambiar esto a true. El dato lo sigue
+ * mandando el backend en `cobertura.bloqueos` — es el que usamos para
+ * diagnosticar, por ejemplo, los 24,130 días de San Miguel sin inventario.
+ */
+const MOSTRAR_BLOQUEOS = false;
+
 const MOSTRAR_PANELES_SIN_DATOS = false;
 
 /** Colores de la matriz, los mismos del Excel de resultados. Van en las
@@ -219,6 +233,9 @@ export class App {
   private readonly nombresDelCatalogo = signal(new Map<string, string>());
   /** Por qué el buscador no trajo nada, cuando la razón no es que no haya. */
   readonly avisoBusqueda = signal<string | null>(null);
+
+  /** Ver MOSTRAR_BLOQUEOS. */
+  readonly mostrarBloqueos = MOSTRAR_BLOQUEOS;
 
   readonly paso = signal<Paso>('inicio');
   readonly archivos = signal<File[]>([]);
@@ -1647,9 +1664,20 @@ export class App {
 
   /** ¿Vale la pena dibujar la fila de CEDIS? Sólo el 11% de los SKU tienen
    *  inventario de CEDIS cargado; para el resto sería una fila vacía. */
-  readonly hayInventarioCedis = computed(() =>
-    (this.expedienteAbierto()?.dias ?? []).some((d) => d.existencia_cedis !== null),
-  );
+  /** ¿Se dibuja la fila de inventario de CEDIS?
+   *
+   *  Dos condiciones, y la primera es de negocio: sólo en Vía 1 el CEDIS
+   *  resguarda producto. En Vía 2 hace crossdock, así que su existencia es
+   *  cero por diseño y la barra hacía pensar que el CEDIS estaba
+   *  desabastecido cuando esa es su operación normal.
+   *
+   *  La segunda es de dibujo: aunque resguarde, sin un solo día con dato la
+   *  fila saldría vacía y sólo ocuparía espacio. */
+  readonly hayInventarioCedis = computed(() => {
+    const ex = this.expedienteAbierto();
+    if (!ex?.cedis_resguarda) return false;
+    return ex.dias.some((d) => d.existencia_cedis !== null);
+  });
 
   altoBarraDia(valor: number | null, escala: 'tienda' | 'cedis' = 'tienda'): string {
     if (valor === null) return '0%';
