@@ -82,6 +82,23 @@ const OCULTAR_AVISOS_SIMA = true;
  * mandando el backend en `cobertura.bloqueos` — es el que usamos para
  * diagnosticar, por ejemplo, los 24,130 días de San Miguel sin inventario.
  */
+/**
+ * INTERRUPTOR — el aviso ámbar de "fuera de alcance".
+ *
+ * Apagado a petición: explica que BOPS entrega todas las divisiones de la
+ * tienda mientras el catálogo sólo cubre Abarrotes, y que por eso hay días
+ * que al modelo no le tocaba explicar. Ya es sabido por quien lee el
+ * reporte.
+ *
+ * NO cambia ningún número: esos días nunca entraron al Pareto ni a la
+ * cobertura del alcance —los filtra dentro_del_alcance()— y siguen saliendo
+ * como RC00 en la clasificación diaria. Lo único que se apaga es el letrero.
+ *
+ * El contraste sigue disponible: la tarjeta de OSA de portada dice "Sobre
+ * los SKU del catálogo de la tienda", y `osa_general` viaja en la respuesta.
+ */
+const MOSTRAR_AVISO_FUERA_DE_ALCANCE = false;
+
 const MOSTRAR_BLOQUEOS = false;
 
 const MOSTRAR_PANELES_SIN_DATOS = false;
@@ -233,6 +250,9 @@ export class App {
   private readonly nombresDelCatalogo = signal(new Map<string, string>());
   /** Por qué el buscador no trajo nada, cuando la razón no es que no haya. */
   readonly avisoBusqueda = signal<string | null>(null);
+
+  /** Ver MOSTRAR_AVISO_FUERA_DE_ALCANCE. */
+  readonly mostrarAvisoFueraDeAlcance = MOSTRAR_AVISO_FUERA_DE_ALCANCE;
 
   /** Ver MOSTRAR_BLOQUEOS. */
   readonly mostrarBloqueos = MOSTRAR_BLOQUEOS;

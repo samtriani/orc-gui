@@ -448,7 +448,9 @@
         <p class="aviso medio">{{ a }}</p>
       }
 
-      @if (hayFueraDeAlcance()) {
+      <!-- Apagado con MOSTRAR_AVISO_FUERA_DE_ALCANCE. No cambia ningún
+           número: esos días nunca entraron al Pareto ni a la cobertura. -->
+      @if (mostrarAvisoFueraDeAlcance && hayFueraDeAlcance()) {
         <p class="aviso medio">
           BOPS entregó {{ r.cobertura!.casos_totales | number }} días con faltante, de los
           cuales <b>{{ r.cobertura!.casos_fuera_de_alcance | number }}</b> son de divisiones que
