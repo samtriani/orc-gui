@@ -117,7 +117,12 @@ const COLOR_CAUSA: Record<string, string> = {
 const COLOR_CAUSA_TIRA: Record<string, string> = {
   RC01: '#f0501e', // Ejecución en Tienda        — 94.1% de los días
   RC06: '#0079c1', // Incumplimiento Proveedor   —  5.3%
-  RC05: '#4e8b2c', // Pedido Proveedor No Gen.   —  0.3%
+  RC05: '#4e8b2c', // Pedido a proveedor no generado —  0.3%
+  // Magenta: es el hueco más ancho que quedaba en la rueda —los otros ocho
+  // ocupan naranja, ámbar, verde, teal, azul, morado, rojo y malva—. Y RC07
+  // pesa mucho más que su hermano RC05, así que necesita color propio y no
+  // un tono vecino del verde.
+  RC07: '#b5307f', // Pedido a proveedor tardío
   RC02: '#7b2d8e', // Transporte / Tránsito      —  0.1%
   RC04: '#00a199', // CEDIS No Surtió            —  0.1%
   RC03: '#b07500', // Pedido de Tienda No Gen.
