@@ -106,19 +106,16 @@ const MOSTRAR_PANELES_SIN_DATOS = false;
 /** Colores de la matriz, los mismos del Excel de resultados. Van en las
  *  fichas de las tablas, que llevan el texto de la causa al lado: ahí el
  *  color acompaña y no necesita cargar la identidad. */
-const COLOR_CAUSA: Record<string, string> = {
-  RC00: '#E6E0F0', // Fuera de alcance — no es una causa, es un dia que no tocaba explicar
-  RC01: '#DDEBF7',
-  RC02: '#FFEB9C',
-  RC03: '#FFC7CE',
-  RC04: '#FFEB9C',
-  RC05: '#FFC7CE',
-  RC06: '#FFC7CE',
-  RC99: '#F2F2F2',
-};
 
 /**
- * Los mismos códigos, saturados, para la tira de causa raíz del expediente.
+ * El color de cada causa raíz. ÚNICA paleta: la usan las barras de "SKU que
+ * más costaron", las fichas de las tablas y la tira del expediente.
+ *
+ * Antes convivía con una segunda, heredada de los pastel del Excel, y esa
+ * repetía colores: RC03, RC05 y RC06 eran el MISMO rosa y RC02 con RC04 el
+ * mismo amarillo, así que en "SKU que más costaron" tres causas distintas se
+ * veían idénticas. RC07 ni existía en ella y caía al gris de "sin
+ * clasificar" — siendo la segunda causa de Coyoacán con 5,312 días.
  *
  * Ahí los pasteles del Excel no sirven: son cuadros de 8 px sobre blanco y
  * `#F2F2F2` o `#DDEBF7` simplemente no se ven — fue lo primero que se notó al
@@ -145,7 +142,7 @@ const COLOR_CAUSA: Record<string, string> = {
  * SKU, más el tooltip por día: la identidad está escrita y el color sólo
  * refuerza. Si se quita la leyenda, esto queda mal.
  */
-const COLOR_CAUSA_TIRA: Record<string, string> = {
+const COLOR_CAUSA: Record<string, string> = {
   RC01: '#f0501e', // Ejecución en Tienda        — 94.1% de los días
   RC06: '#0079c1', // Incumplimiento Proveedor   —  5.3%
   RC05: '#4e8b2c', // Pedido a proveedor no generado —  0.3%
@@ -1788,12 +1785,13 @@ export class App {
   // -- ayudas de presentación ---------------------------------------------
 
   color(rc: string): string {
-    return COLOR_CAUSA[rc] ?? '#F2F2F2';
+    return COLOR_CAUSA[rc] ?? '#8a8a95';
   }
 
-  /** El mismo código, saturado, para la tira del expediente. */
+  /** Alias de `color`. Se conserva porque la tira del expediente lo llama por
+   *  su nombre viejo, de cuando había dos paletas. */
   colorTira(rc: string): string {
-    return COLOR_CAUSA_TIRA[rc] ?? '#8a8a95';
+    return this.color(rc);
   }
 
   /** Semáforo del cumplimiento del proveedor: mismos cortes que el Excel. */
