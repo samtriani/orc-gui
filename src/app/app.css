@@ -534,13 +534,6 @@ tr.fila-mal td {
   margin-top: 6px;
 }
 
-.expediente-dia {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  flex: 0 0 26px;
-}
 
 .expediente-barras {
   display: flex;
@@ -585,22 +578,7 @@ tr.fila-mal td {
 /* PT/CD/PV. El inactivo estaba en var(--linea) (#e3e3ea): sobre blanco no
    se leia. Ahora el activo es tinta plena y el inactivo un gris que si se
    distingue sin competir con el. */
-.expediente-marcas {
-  display: flex;
-  gap: 2px;
-  font-size: 8px;
-  font-weight: 700;
-  color: #bcbcc6;
-}
-.expediente-marcas span.activa {
-  color: var(--tinta);
-}
 
-.expediente-dia-num {
-  font-size: 10px;
-  color: var(--tinta-suave);
-  font-variant-numeric: tabular-nums;
-}
 
 /* La tira de causa raiz. Sube de 8 a 11 px y lleva un aro de superficie:
    con 43 dias pegados, sin separacion dos dias de la misma causa se leian
@@ -1198,4 +1176,88 @@ a.descarga::before { background: var(--acento) !important; }
    reporte reconoce el nombre, no el número. */
 .clave-tienda {
   color: var(--tinta-suave);
+}
+
+/* ---------------- gráfica diaria: una fila por serie ----------------
+   Antes era una columna por día y cada una repetía "PT CD PV" en 8 px, así
+   que la etiqueta había que releerla 30 veces y activo vs. inactivo era sólo
+   un cambio de tono del texto. Ahora la etiqueta va una vez a la izquierda y
+   cada serie es una fila: los días encendidos se leen como una banda.
+
+   Todas las filas comparten el mismo ancho de celda, así que las barras, las
+   marcas, el número de día y la causa quedan alineados por construcción. */
+.expediente {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow-x: auto;
+  padding: 14px 2px 6px;
+  margin-top: 6px;
+}
+
+.exp-fila {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* La etiqueta se queda fija al hacer scroll horizontal: con 43 días se sale
+   de pantalla, y una fila sin nombre no se puede leer. */
+.exp-eti {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  flex: 0 0 118px;
+  padding-right: 8px;
+  background: #fff;
+  font-size: 10.5px;
+  line-height: 1.2;
+  color: var(--tinta-suave);
+  text-align: right;
+}
+
+.exp-eti b {
+  color: var(--tinta);
+}
+
+.exp-celda {
+  flex: 0 0 26px;
+  display: flex;
+  justify-content: center;
+}
+
+.exp-fila-barras .exp-celda,
+.exp-fila-barras .expediente-barras {
+  width: 26px;
+}
+
+.exp-fila-marca {
+  height: 15px;
+}
+
+/* Encendido = relleno sólido; apagado = un punto tenue. Se eligió relleno y
+   no palomita/tacha porque la tacha se lee como error, y que un día no tenga
+   pedido de tienda no siempre lo es. */
+.exp-marca {
+  display: block;
+  width: 20px;
+  height: 11px;
+  border-radius: 3px;
+  background: #ececf1;
+  box-shadow: inset 0 0 0 1px #e0e0e8;
+}
+
+.exp-marca.on {
+  background: var(--tinta);
+  box-shadow: none;
+}
+
+.exp-fila-dias .exp-celda {
+  font-size: 10px;
+  color: var(--tinta-suave);
+  font-variant-numeric: tabular-nums;
+}
+
+.exp-fila-causa .exp-celda > i {
+  width: 100%;
 }

@@ -4,7 +4,7 @@ import { Component, ElementRef, WritableSignal, computed, effect, inject, signal
 import { Observable, Subject, of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Analisis, CitaFallada, Corrida, Expediente, FilaCausa, FilaProveedor,
+import { Analisis, CitaFallada, Corrida, DiaExpediente, Expediente, FilaCausa, FilaProveedor,
          FilaResponsable, FilaSkuTienda, FilaSubcausa, Orcmm, Tienda,
          Waterfall } from './orcmm';
 import { Paginador, PaginadorCtrl } from './paginacion';
@@ -247,6 +247,28 @@ export class App {
   private readonly nombresDelCatalogo = signal(new Map<string, string>());
   /** Por qué el buscador no trajo nada, cuando la razón no es que no haya. */
   readonly avisoBusqueda = signal<string | null>(null);
+
+  /**
+   * Las tres series booleanas de la gráfica diaria, en el orden de la cadena:
+   * primero pide la tienda, luego viaja, luego lo repone el proveedor.
+   *
+   * Van en un arreglo y no escritas a mano en la plantilla para que la
+   * etiqueta, el tooltip y el dato salgan del MISMO lugar: antes el HTML
+   * decía "CD" y el título decía "Tránsito", y sólo con leer los dos se
+   * notaba que no hablaban de lo mismo.
+   */
+  readonly marcasExpediente = [
+    { clave: 'PT', etiqueta: 'Pedido de tienda',
+      ayuda: 'Pedido de la tienda a CEDIS abierto ese día',
+      activo: (d: DiaExpediente) => !!d.pedido_tienda_abierto },
+    // Se llamaba CD, que se leía como "CEDIS" y no como lo que mide.
+    { clave: 'TR', etiqueta: 'Tránsito',
+      ayuda: 'Envío generado o mercancía en tránsito de CEDIS a tienda',
+      activo: (d: DiaExpediente) => !!(d.transito_vigente || d.envio_generado) },
+    { clave: 'PV', etiqueta: 'Pedido a proveedor',
+      ayuda: 'Orden a proveedor vigente ese día',
+      activo: (d: DiaExpediente) => !!d.orden_proveedor_vigente },
+  ];
 
   /** Ver MOSTRAR_AVISO_FUERA_DE_ALCANCE. */
   readonly mostrarAvisoFueraDeAlcance = MOSTRAR_AVISO_FUERA_DE_ALCANCE;
