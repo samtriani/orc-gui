@@ -535,7 +535,7 @@
               <option value="" [selected]="!filtroCausa()">Todas</option>
               @for (c of causas(); track c.id) {
                 <option [value]="c.id" [selected]="c.id === filtroCausa()">
-                  {{ c.id }} · {{ c.causa }}
+                  {{ c.causa }}
                 </option>
               }
             </select>
@@ -725,7 +725,7 @@
             @for (e of wf.escalones; track e.root_cause_id) {
               <div class="agua-fila" [class.sin-impacto]="!e.dias">
                 <span class="agua-eti" [title]="e.responsable || 'Sin días en el periodo'">
-                  {{ e.root_cause_id }} · {{ e.causa }}
+                  {{ e.causa }}
                 </span>
                 <span class="agua-barra">
                   @if (e.dias) {
@@ -938,9 +938,8 @@
               @for (c of pgCausas.items(); track c.root_cause_id) {
                 <tr>
                   <td>
-                    <span class="chip" [style.background]="color(c.root_cause_id)">{{
-                      c.root_cause_id
-                    }}</span>
+                    <span class="chip muestra" [style.background]="color(c.root_cause_id)"
+                          [title]="c.causa"></span>
                     {{ c.causa }}
                   </td>
                   <td class="num">${{ c.venta_perdida | number: '1.2-2' }}</td>
@@ -1187,9 +1186,8 @@
                     }
                   </td>
                   <td>
-                    <span class="chip" [style.background]="color(s.root_cause_id)">{{
-                      s.root_cause_id
-                    }}</span>
+                    <span class="chip muestra" [style.background]="color(s.root_cause_id)"
+                          [title]="s.causa"></span>
                     {{ s.causa }}
                   </td>
                   <td>{{ s.responsable }}</td>
@@ -1427,7 +1425,7 @@
                       class="expediente-causa"
                       [class.sin-faltante]="!d.root_cause_id"
                       [style.background]="d.root_cause_id ? colorTira(d.root_cause_id) : ''"
-                      [title]="d.root_cause_id ? d.root_cause_id + ' · ' + d.causa_raiz : 'Sin faltante'"
+                      [title]="d.root_cause_id ? d.causa_raiz : 'Sin faltante'"
                     ></i>
                   </span>
                 }
@@ -1447,7 +1445,7 @@
             @if (causasDelExpediente().length) {
               <div class="leyenda">
                 @for (c of causasDelExpediente(); track c.id) {
-                  <span><i [style.background]="colorTira(c.id)"></i>{{ c.id }} · {{ c.causa }}</span>
+                  <span><i [style.background]="colorTira(c.id)"></i>{{ c.causa }}</span>
                 }
                 <span><i class="sin-faltante"></i>Sin faltante</span>
               </div>

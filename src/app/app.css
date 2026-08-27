@@ -798,6 +798,19 @@ tr.fila-mal td {
   gap: 6px;
   margin-top: 10px;
 }
+/* El chip sin texto dentro. Los códigos RC0x salieron de la pantalla —no
+   le dicen nada al cliente— pero el color sigue haciendo falta para ligar el
+   renglón con su barra en las gráficas, así que el chip se queda como
+   muestra: un cuadrito del color de la causa, con la descripción al lado. */
+.chip.muestra {
+  min-width: 0;
+  width: 11px;
+  height: 11px;
+  padding: 0;
+  border-radius: 3px;
+  vertical-align: baseline;
+}
+
 .chip.claro {
   background: #fff;
   border: 1px solid var(--linea);

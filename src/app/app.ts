@@ -151,6 +151,13 @@ const COLOR_CAUSA: Record<string, string> = {
   // pesa mucho más que su hermano RC05, así que necesita color propio y no
   // un tono vecino del verde.
   RC07: '#b5307f', // Pedido a proveedor tardío
+  // "Pedidos" — la fusión de RC03, RC05 y RC07 (ver FUSIONAR_PEDIDOS en el
+  // motor). Se queda con el magenta de RC07 a propósito: de los 8,216 días de
+  // la bolsa, 5,312 ya eran RC07, así que la tira diaria se ve casi igual
+  // antes y después de fusionar y nadie tiene que reaprender el color. Los
+  // tres códigos originales siguen en el mapa para que apagar el interruptor
+  // no deje ninguna causa sin color.
+  RC08: '#b5307f', // Pedidos
   RC02: '#7b2d8e', // Transporte / Tránsito      —  0.1%
   RC04: '#00a199', // CEDIS No Surtió            —  0.1%
   RC03: '#b07500', // Pedido de Tienda No Gen.
