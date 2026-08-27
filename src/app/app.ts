@@ -832,11 +832,15 @@ export class App {
   /** Vía de resurtido. Es la que USÓ el modelo, no la del catálogo: desde que
    *  los pedidos DSD se leen de COMPRAS, hay SKU marcados "Vía 2" que se
    *  clasifican por la rama directa. Viene en el catálogo de combos. */
-  readonly filtroVia = signal('');
+  readonly filtroVia = signal<string[]>([]);
 
   /** Decil de venta, de CATALOGO. Filtra igual que la vía: entra al mismo
-   *  combo, así que recompone el denominador del OSA sin código extra. */
-  readonly filtroDecil = signal('');
+   *  combo, así que recompone el denominador del OSA sin código extra.
+   *
+   *  Multiselección con semántica OR: la pregunta del negocio no es "¿cómo va
+   *  el decil 2?" sino "¿cómo va el top de rotación?", y eso son los deciles
+   *  1 a 3 SUMADOS. De uno en uno no se pueden agregar. */
+  readonly filtroDecil = signal<string[]>([]);
   readonly filtroResponsable = signal('');
   readonly filtroProveedor = signal<string[]>([]);
   readonly entradaProveedor = signal('');
@@ -891,8 +895,8 @@ export class App {
         this.filtroCausa() ||
         this.filtroResponsable() ||
         this.filtroProveedor().length ||
-        this.filtroVia() ||
-        this.filtroDecil() ||
+        this.filtroVia().length ||
+        this.filtroDecil().length ||
         NIVELES.some((n) => this.filtroNivel[n]().length)
       ),
   );
@@ -1090,7 +1094,7 @@ export class App {
     const puestas = NIVELES.map((n) => this.filtroNivel[n]());
     const via = this.filtroVia();
     const decil = this.filtroDecil();
-    if (!via && !decil && !puestas.some((p) => p.length)) return null;
+    if (!via.length && !decil.length && !puestas.some((p) => p.length)) return null;
     // Un SKU sin ficha comercial (fuera del catálogo, RC00) cae en el combo
     // de puros nulos y no pertenece a ninguna sección: con un filtro puesto
     // queda fuera, también del denominador del waterfall.
@@ -1101,8 +1105,8 @@ export class App {
     return this.combos().map(
       (c) =>
         puestas.every((p, i) => this.coincideAlguna([c[i]], p)) &&
-        (!via || c[IDX_VIA] === via) &&
-        (!decil || c[IDX_DECIL] === decil),
+        this.coincideAlguna([c[IDX_VIA]], via) &&
+        this.coincideAlguna([c[IDX_DECIL]], decil),
     );
   });
 
@@ -1593,13 +1597,26 @@ export class App {
     this.reiniciarPaginas();
   }
 
-  ponDecil(e: Event): void {
-    this.filtroDecil.set((e.target as HTMLSelectElement).value);
+  /** Prende o apaga un valor de un filtro de fichas. Son conjuntos chicos y
+   *  cerrados —3 vías, 10 deciles— así que se muestran todas las opciones y
+   *  se alternan con un clic, en vez de abrir un desplegable por cada una.
+   *
+   *  Reinicia la paginación como los demás filtros: si estabas en la página
+   *  4 y el filtro deja tres renglones, la tabla se vería vacía. */
+  private alternar(sen: WritableSignal<string[]>, valor: string): void {
+    const puestas = sen();
+    sen.set(puestas.includes(valor)
+      ? puestas.filter((v) => v !== valor)
+      : [...puestas, valor]);
+    this.reiniciarPaginas();
   }
 
-  ponVia(e: Event): void {
-    this.filtroVia.set((e.target as HTMLSelectElement).value);
-    this.reiniciarPaginas();
+  alternarVia(v: string): void {
+    this.alternar(this.filtroVia, v);
+  }
+
+  alternarDecil(d: string): void {
+    this.alternar(this.filtroDecil, d);
   }
 
   ponCausa(e: Event): void {
@@ -1618,8 +1635,8 @@ export class App {
     this.filtroTienda.set('');
     this.filtroCausa.set('');
     this.filtroResponsable.set('');
-    this.filtroVia.set('');
-    this.filtroDecil.set('');
+    this.filtroVia.set([]);
+    this.filtroDecil.set([]);
     this.filtroProveedor.set([]);
     this.entradaProveedor.set('');
     for (const n of NIVELES) {

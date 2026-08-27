@@ -541,28 +541,38 @@
             </select>
           </label>
 
-          @if (deciles().length > 1) {
-            <label class="campo">
-              <span>Decil</span>
-              <select (change)="ponDecil($event)">
-                <option value="" [selected]="!filtroDecil()">Todos</option>
-                @for (d of deciles(); track d) {
-                  <option [value]="d" [selected]="d === filtroDecil()">{{ d }}</option>
+
+          <!-- Fichas y no desplegable: son conjuntos chicos y cerrados, así
+               que se ven todas las opciones y se alternan con un clic. Con
+               diez deciles, "el top de rotación" son tres clics, no tres
+               vueltas a un menú. Vacío = todas, que es lo mismo que todas
+               marcadas pero se lee más claro. -->
+          @if (vias().length > 1) {
+            <div class="campo">
+              <span>Vía</span>
+              <div class="fichas-alternar">
+                @for (v of vias(); track v) {
+                  <button type="button" class="ficha-alterna"
+                          [class.puesta]="filtroVia().includes(v)"
+                          [attr.aria-pressed]="filtroVia().includes(v)"
+                          (click)="alternarVia(v)">{{ v }}</button>
                 }
-              </select>
-            </label>
+              </div>
+            </div>
           }
 
-          @if (vias().length > 1) {
-            <label class="campo">
-              <span>Vía</span>
-              <select (change)="ponVia($event)">
-                <option value="" [selected]="!filtroVia()">Todas</option>
-                @for (v of vias(); track v) {
-                  <option [value]="v" [selected]="v === filtroVia()">{{ v }}</option>
+          @if (deciles().length > 1) {
+            <div class="campo">
+              <span>Decil</span>
+              <div class="fichas-alternar">
+                @for (d of deciles(); track d) {
+                  <button type="button" class="ficha-alterna"
+                          [class.puesta]="filtroDecil().includes(d)"
+                          [attr.aria-pressed]="filtroDecil().includes(d)"
+                          (click)="alternarDecil(d)">{{ d }}</button>
                 }
-              </select>
-            </label>
+              </div>
+            </div>
           }
 
           <label class="campo">
