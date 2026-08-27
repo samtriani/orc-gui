@@ -27,6 +27,13 @@ function normalizar(s: string): string {
  *  —elegir una sección acota las categorías, y así hacia abajo—, y los
  *  nombres son los mismos campos que manda el backend en `por_sku_tienda`. */
 const NIVELES = ['seccion', 'categoria', 'subcategoria', 'marca'] as const;
+
+/** Posición de la vía y del decil dentro del combo de jerarquía, después
+ *  de los cuatro niveles comerciales. Con nombre y no como número suelto:
+ *  el backend arma [sección, categoría, subcategoría, marca, vía, decil] y
+ *  un índice equivocado no truena, sólo filtra de más o de menos. */
+const IDX_VIA = NIVELES.length;
+const IDX_DECIL = NIVELES.length + 1;
 type Nivel = (typeof NIVELES)[number];
 
 type Paso = 'inicio' | 'trabajando' | 'bloqueado' | 'listo' | 'sin-datos' | 'error';
@@ -826,6 +833,10 @@ export class App {
    *  los pedidos DSD se leen de COMPRAS, hay SKU marcados "Vía 2" que se
    *  clasifican por la rama directa. Viene en el catálogo de combos. */
   readonly filtroVia = signal('');
+
+  /** Decil de venta, de CATALOGO. Filtra igual que la vía: entra al mismo
+   *  combo, así que recompone el denominador del OSA sin código extra. */
+  readonly filtroDecil = signal('');
   readonly filtroResponsable = signal('');
   readonly filtroProveedor = signal<string[]>([]);
   readonly entradaProveedor = signal('');
@@ -881,6 +892,7 @@ export class App {
         this.filtroResponsable() ||
         this.filtroProveedor().length ||
         this.filtroVia() ||
+        this.filtroDecil() ||
         NIVELES.some((n) => this.filtroNivel[n]().length)
       ),
   );
@@ -984,8 +996,16 @@ export class App {
   /** Las vías presentes en el resultado. Van en la posición 4 del combo,
    *  después de los cuatro niveles comerciales. */
   readonly vias = computed(() =>
-    [...new Set(this.combosVivos().map((c) => c[NIVELES.length])
+    [...new Set(this.combosVivos().map((c) => c[IDX_VIA])
       .filter((v): v is string => !!v))].sort(),
+  );
+
+  /** Los deciles presentes, en orden NATURAL: alfabéticamente "Decil 10" va
+   *  antes que "Decil 2", que es justo al revés de como se lee. */
+  readonly deciles = computed(() =>
+    [...new Set(this.combosVivos().map((c) => c[IDX_DECIL])
+      .filter((v): v is string => !!v))]
+      .sort((a, b) => a.localeCompare(b, 'es', { numeric: true })),
   );
 
   /** Si el análisis corrió sin catálogo comercial (modo archivo, o la tabla
@@ -1069,7 +1089,8 @@ export class App {
   private readonly combosQuePasan = computed<boolean[] | null>(() => {
     const puestas = NIVELES.map((n) => this.filtroNivel[n]());
     const via = this.filtroVia();
-    if (!via && !puestas.some((p) => p.length)) return null;
+    const decil = this.filtroDecil();
+    if (!via && !decil && !puestas.some((p) => p.length)) return null;
     // Un SKU sin ficha comercial (fuera del catálogo, RC00) cae en el combo
     // de puros nulos y no pertenece a ninguna sección: con un filtro puesto
     // queda fuera, también del denominador del waterfall.
@@ -1080,7 +1101,8 @@ export class App {
     return this.combos().map(
       (c) =>
         puestas.every((p, i) => this.coincideAlguna([c[i]], p)) &&
-        (!via || c[NIVELES.length] === via),
+        (!via || c[IDX_VIA] === via) &&
+        (!decil || c[IDX_DECIL] === decil),
     );
   });
 
@@ -1571,6 +1593,10 @@ export class App {
     this.reiniciarPaginas();
   }
 
+  ponDecil(e: Event): void {
+    this.filtroDecil.set((e.target as HTMLSelectElement).value);
+  }
+
   ponVia(e: Event): void {
     this.filtroVia.set((e.target as HTMLSelectElement).value);
     this.reiniciarPaginas();
@@ -1593,6 +1619,7 @@ export class App {
     this.filtroCausa.set('');
     this.filtroResponsable.set('');
     this.filtroVia.set('');
+    this.filtroDecil.set('');
     this.filtroProveedor.set([]);
     this.entradaProveedor.set('');
     for (const n of NIVELES) {

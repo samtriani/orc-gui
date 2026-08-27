@@ -541,6 +541,18 @@
             </select>
           </label>
 
+          @if (deciles().length > 1) {
+            <label class="campo">
+              <span>Decil</span>
+              <select (change)="ponDecil($event)">
+                <option value="" [selected]="!filtroDecil()">Todos</option>
+                @for (d of deciles(); track d) {
+                  <option [value]="d" [selected]="d === filtroDecil()">{{ d }}</option>
+                }
+              </select>
+            </label>
+          }
+
           @if (vias().length > 1) {
             <label class="campo">
               <span>Vía</span>
