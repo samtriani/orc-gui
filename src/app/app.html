@@ -548,7 +548,7 @@
                vueltas a un menú. Vacío = todas, que es lo mismo que todas
                marcadas pero se lee más claro. -->
           @if (vias().length > 1) {
-            <div class="campo">
+            <div class="campo fichas">
               <span>Vía</span>
               <div class="fichas-alternar">
                 @for (v of vias(); track v) {
@@ -562,14 +562,18 @@
           }
 
           @if (deciles().length > 1) {
-            <div class="campo">
+            <div class="campo fichas">
               <span>Decil</span>
-              <div class="fichas-alternar">
+              <!-- Sólo el número: ver etiquetaDecil. El nombre completo viaja
+                   en el title para quien pase el ratón o use lector. -->
+              <div class="fichas-alternar numericas">
                 @for (d of deciles(); track d) {
                   <button type="button" class="ficha-alterna"
                           [class.puesta]="filtroDecil().includes(d)"
                           [attr.aria-pressed]="filtroDecil().includes(d)"
-                          (click)="alternarDecil(d)">{{ d }}</button>
+                          [attr.aria-label]="d"
+                          [title]="d"
+                          (click)="alternarDecil(d)">{{ etiquetaDecil(d) }}</button>
                 }
               </div>
             </div>

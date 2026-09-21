@@ -168,6 +168,13 @@ const COLOR_CAUSA: Record<string, string> = {
   RC02: '#7b2d8e', // Transporte / Tránsito      —  0.1%
   RC04: '#00a199', // CEDIS No Surtió            —  0.1%
   RC03: '#b07500', // Pedido de Tienda No Gen.
+  // "Inventario Ficticio en Tienda" — hermano de RC01: los dos son inventario
+  // en tienda, así que el Pareto los va a mostrar pegados y el color es lo
+  // único que los separa de un vistazo. Café y no un naranja vecino porque se
+  // midió: contra los otros nueve, su separación mínima es ΔE 40, mejor
+  // incluso que el par más parecido que ya vivía en la paleta (ΔE 29). Un
+  // naranja claro daba 24 y habría repetido la queja de "no se distingue".
+  RC09: '#6b4423', // Inventario Ficticio en Tienda
   RC99: '#a10c22', // Sin clasificar — rojo: es una alarma, no una causa
   RC00: '#8f86a8', // Fuera de alcance — malva apagado: no es alarma, es "no tocaba"
 };
@@ -1617,6 +1624,19 @@ export class App {
 
   alternarDecil(d: string): void {
     this.alternar(this.filtroDecil, d);
+  }
+
+  /** "Decil 7" -> "7". El grupo ya se llama DECIL, así que repetir la
+   *  palabra en cada pastilla sólo gasta ancho: con las diez completas no
+   *  caben en un renglón, se parten en dos columnas y el bloque crece a
+   *  cinco líneas. Como es el más alto de la fila, arrastraba la altura de
+   *  todo el panel —que va pegado arriba— y tapaba la gráfica.
+   *
+   *  Un valor con otra forma —"Top", "A"— se muestra completo: el
+   *  normalizador del back los respeta, y aquí también. */
+  etiquetaDecil(d: string): string {
+    const m = /^decil\s+(\d+)$/i.exec(d);
+    return m ? m[1] : d;
   }
 
   ponCausa(e: Event): void {
